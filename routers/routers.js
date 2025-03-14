@@ -9,10 +9,9 @@ import Register from "../components/Auth/Register";
 import StartPage from "../components/Auth/StartPage";
 import NewPassword from "../components/Auth/NewPassword";
 import ForgetPassword from "../components/Auth/ForgetPassword";
-import HomePage from "../components/User/HomePage";
-import Contact from "../components/User/Contact";
-import Profile from "../components/User/Profile";
-import VerifyResetPassword from "../components/Auth/VerifyResetPassword";
+import HomePage from "../components/Message/HomePage";
+import Contact from "../components/Contact/Contact";
+import Profile from "../components/Profile/Profile";
 import UserProfileScreen from "../components/Auth/UserProfileScreen";
 
 const Stack = createStackNavigator();
