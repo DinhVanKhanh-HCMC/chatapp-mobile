@@ -20,8 +20,9 @@ export default function App() {
         },
       }}
      >
-      {/* <Router/> */}
-      <PersonalInfoScreen/>
+      <Router/>
+      {/* <ChatScreen/> */}
+      {/* <PersonalInfoScreen/> */}
     </NavigationContainer>
   );
 }

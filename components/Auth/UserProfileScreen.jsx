@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   ScrollView,
   Platform,
+  Image,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -17,6 +18,9 @@ import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import "react-datepicker/dist/react-datepicker.css";
 import { Toast } from 'antd-mobile';
+import {Camera} from 'react-native-feather';
+import * as ImagePicker from 'expo-image-picker';
+
 
 const UserProfileScreen = ({ navigation }) => {
   const [displayName, setDisplayName] = useState('');
@@ -29,6 +33,7 @@ const UserProfileScreen = ({ navigation }) => {
   const [avatarUri, setAvatarUri] = useState('');
   const nav = useNavigation();
   const [selectedFile, setSelectedFile] = useState(null);
+  const [profileImage, setProfileImage] = useState(null);
 
   const handleContinue = () => {
     // Handle form submission logic here
@@ -80,6 +85,18 @@ const UserProfileScreen = ({ navigation }) => {
       setFormData((prev) => ({ ...prev, dateOfBirth: formattedDate }));
     }
   }
+  //chuyển đổi kiểu Base64 thành Blob
+  const dataURLtoBlob = (dataURL) => {
+    const arr = dataURL.split(',');
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    let n = bstr.length;
+    const u8arr = new Uint8Array(n);
+    while(n--){
+        u8arr[n] = bstr.charCodeAt(n);
+    }
+    return new Blob([u8arr], {type:mime});
+  };
 
 
   const handleSubmit = async (e) => {
@@ -94,19 +111,31 @@ const UserProfileScreen = ({ navigation }) => {
     formDataToSend.append("gender", formData.gender);
 
     if (selectedFile) {
-        formDataToSend.append("image", selectedFile);
+        console.log("Selected File: ", selectedFile);
+        const blob = dataURLtoBlob(selectedFile.uri);
+        formDataToSend.append("image", blob, selectedFile.name);
     }
 
     try {
         const response = await ApiService.register(formDataToSend);
-        if (response.status === 201 || response.status === 200) {
+        console.log("api xu ly xong");
+        console.log(""+response.data.code);
+        console.log(""+response.data.message);
+        
+        if (response.status === 201 ||  response.data.code === 200) {
           Toast.show({
             icon : 'success',
             content : "Hồ sơ đã được lưu thành công!"
           })
             nav.navigate("Login");
+        }else{
+          Toast.show({
+            icon : 'error',
+            content : "Đăng ký thất bại: "+response.data.message
+          })
         }
     } catch (error) {
+      console.log(error)
       Toast.show({
         icon : 'error',
         content : "Lưu hồ sơ thất bại, vui lòng thử lại"
@@ -114,11 +143,37 @@ const UserProfileScreen = ({ navigation }) => {
     }
 };
 
-  const handleImagePick = () => {
-    // Implement image picking logic here
-    // For this example, we'll just set a dummy URI
-    setAvatarUri('https://example.com/avatar.jpg');
-  };
+const handlePickImage = async () => {
+  // Yêu cầu quyền truy cập thư viện
+  const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+  if (status !== 'granted') {
+    Alert.alert('Quyền bị từ chối', 'Bạn cần cấp quyền truy cập để chọn ảnh.');
+    return;
+  }
+
+  // Mở thư viện ảnh
+  const result = await ImagePicker.launchImageLibraryAsync({
+    mediaTypes: ImagePicker.MediaTypeOptions.Images,
+    allowsEditing: true,
+    aspect: [4, 3],
+    quality: 1,
+  });
+
+  if (!result.canceled) {
+    const selectedAsset = result.assets[0];
+    
+    // Cập nhật vào state để hiển thị trong Image
+    setProfileImage(selectedAsset.uri);
+
+    // Gửi dữ liệu vào formData
+    setSelectedFile({
+      uri: selectedAsset.uri,
+      type: selectedAsset.type || 'image/jpeg',
+      name: selectedAsset.fileName || `image_${Date.now()}.jpg`,
+    });
+  }
+};
+
 
   const isValidForm = 
   formData.displayName.trim() !== "" && 
@@ -143,6 +198,21 @@ const UserProfileScreen = ({ navigation }) => {
       </LinearGradient>
 
       <ScrollView style={styles.content}>
+
+        <View style={styles.profileImageContainer}>
+          {profileImage ? (
+            <Image source={{ uri: profileImage }} style={styles.profileImage} />
+          ) : (
+            <View style={styles.profileImagePlaceholder}>
+              <Camera width={32} height={32} color="#666" />
+            </View>
+          )}
+          <TouchableOpacity style={styles.cameraButton} onPress={handlePickImage}>
+            <Camera width={20} height={20} color="#666" />
+          </TouchableOpacity>
+        </View>
+
+
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.input}
@@ -412,6 +482,34 @@ const styles = StyleSheet.create({
     color: '#0066ff',
     fontSize: 16,
     fontWeight: '600',
+  },
+  profileImageContainer: {
+    alignItems: 'center',
+    marginBottom: 32,
+    position: 'relative',
+  },
+  profileImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+  },
+  profileImagePlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#f0f0f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cameraButton: {
+    position: 'absolute',
+    bottom: 0,
+    right: '35%',
+    backgroundColor: '#fff',
+    padding: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#ddd',
   },
 });
 

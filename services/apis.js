@@ -54,10 +54,13 @@ export default class ApiService {
 
         return response; // Trả về response để xử lý ở handleSubmit
     } catch (error) {
-        console.error("❌ Error saving profile:", error.response?.data || error.message);
-        throw error; // Ném lỗi để handleSubmit xử lý
-    }
-};
+      console.error("❌ Error saving profile:", error.response?.data?.message || error.message);
+      Toast.show({
+          icon : 'error',
+          content : error.response?.data?.message || "Lưu hồ sơ thất bại, vui lòng thử lại"
+      });
+  }
+  };
 
 
   static async resetPassword(resetPasswordDetails) {
