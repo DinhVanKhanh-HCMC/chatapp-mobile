@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,48 +9,99 @@ import {
   FlatList,
   Image,
   Modal,
+  ActivityIndicator
 } from 'react-native';
 import { MessageCircle, Users, User, Plus, Search, UserPlus, Users as UsersGroup } from 'react-native-feather';
 import { LinearGradient } from 'expo-linear-gradient';
 import BottomMenuBar from '../Sidebar/BottomMenuBar';
+import ApiService from '../../services/apis';
 
 const HomePage = ({navigation}) => {
   const [activeTab, setActiveTab] = useState('messages');
   const [showModal, setShowModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [conversations, setConversations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  const chatData = [
-    {
-      id: '1',
-      name: 'Vương Minh Thông',
-      lastMessage: '[Thiệp] Gửi lời chào Vương Minh Thông',
-      date: '18/02',
-      avatar: 'https://i.pravatar.cc/100?img=1',
-    },
-    {
-      id: '2',
-      name: 'Anh 3 Thanhhh',
-      lastMessage: 'Hi Hi',
-      date: '16/02',
-      avatar: 'https://i.pravatar.cc/100?img=2',
-    },
-    // Add more chat data as needed
-  ];
+  useEffect(() => {
+    const fetchConversations = async () => {
+      try {
+        setLoading(true);
+        const response = await ApiService.getAllConversations();
+        if (response && response.data) {
+          setConversations(response.data);
+        }
+      } catch (err) {
+        setError(err.message || 'Không thể tải danh sách trò chuyện');
+        console.error('Error fetching conversations:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchConversations();
+  }, []);
+
+  const formatDate = (dateString) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    return `${date.getDate()}/${date.getMonth() + 1}`;
+  };
+
+  const getConversationName = (conversation) => {
+    if (conversation.isGroup) {
+      return conversation.name || 'Nhóm không tên';
+    } else {
+      // Trường hợp không phải nhóm, hiển thị tên người dùng khác trong cuộc trò chuyện
+      // Bạn cần thêm logic để lấy tên người dùng khác ở đây
+      // Ví dụ: lọc ra user khác với user hiện tại
+      return 'Người dùng cá nhân'; // Tạm thời để như vậy, bạn cần cập nhật
+    }
+  };
+
+  const getAvatar = (conversation) => {
+    // Nếu là nhóm hoặc chưa có avatar, trả về avatar mặc định
+    // Bạn có thể thêm logic để lấy avatar của người dùng khác nếu là chat cá nhân
+    return conversation.isGroup 
+      ? 'https://i.pravatar.cc/100?img=3' 
+      : 'https://i.pravatar.cc/100?img=1';
+  };
 
   const renderChatItem = ({ item }) => (
-    <TouchableOpacity style={styles.chatItem}>
-      <Image source={{ uri: item.avatar }} style={styles.avatar} />
+    <TouchableOpacity 
+      style={styles.chatItem}
+      onPress={() => navigation.navigate('Chat', { conversationId: item.id })}
+    >
+      <Image source={{ uri: getAvatar(item) }} style={styles.avatar} />
       <View style={styles.chatInfo}>
         <View style={styles.chatHeader}>
-          <Text style={styles.chatName}>{item.name}</Text>
-          <Text style={styles.chatDate}>{item.date}</Text>
+          <Text style={styles.chatName}>{getConversationName(item)}</Text>
+          <Text style={styles.chatDate}>{formatDate(item.lastMessageAt)}</Text>
         </View>
         <Text style={styles.lastMessage} numberOfLines={1}>
-          {item.lastMessage}
+          {/* Bạn có thể thêm logic hiển thị tin nhắn cuối cùng ở đây */}
+          {item.lastMessage || 'Bắt đầu trò chuyện'}
         </Text>
       </View>
     </TouchableOpacity>
   );
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0088ff" />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -74,7 +125,7 @@ const HomePage = ({navigation}) => {
       </LinearGradient>
 
       <FlatList
-        data={chatData}
+        data={conversations}
         renderItem={renderChatItem}
         keyExtractor={item => item.id}
         style={styles.chatList}
@@ -82,7 +133,6 @@ const HomePage = ({navigation}) => {
 
       <BottomMenuBar navigation={navigation} activeTab={activeTab} />
       
-
       <Modal
         visible={showModal}
         transparent={true}

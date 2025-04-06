@@ -107,6 +107,26 @@ export default class ApiService {
     }
   }
 
+  //get conversation
+  static async getAllConversations() {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.get(`${BASE_URL}/conversation`, {
+        headers: headers,
+      });
+  
+      return response.data; // Trả về danh sách các conversation
+    } catch (error) {
+      Toast.show({
+        icon: 'fail',
+        content: 'Không thể lấy danh sách cuộc trò chuyện!',
+      });
+      throw error;
+    }
+  }
+  
+
+
   // // USER
 
   // static async getAllUser() {
