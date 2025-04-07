@@ -54,6 +54,7 @@ export default function LoginScreen({navigation}) {
       
       // Lưu token vào AsyncStorage
       await AsyncStorage.setItem("token", data.data.token);
+      await AsyncStorage.setItem("id", data.data.user.id);
       
       // Chuyển hướng người dùng đến trang "UserScreen"
       nav.navigate('Home');

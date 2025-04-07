@@ -23,6 +23,7 @@ const Profile = ({ navigation }) => {
     try {
       await AsyncStorage.removeItem('token'); // Xóa access token
       await AsyncStorage.removeItem('email');
+      await AsyncStorage.removeItem('id');
       console.log('Tokens cleared successfully');
     } catch (error) {
       console.error('Failed to clear tokens:', error);

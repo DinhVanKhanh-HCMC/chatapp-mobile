@@ -15,6 +15,7 @@ import { MessageCircle, Users, User, Plus, Search, UserPlus, Users as UsersGroup
 import { LinearGradient } from 'expo-linear-gradient';
 import BottomMenuBar from '../Sidebar/BottomMenuBar';
 import ApiService from '../../services/apis';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const HomePage = ({navigation}) => {
   const [activeTab, setActiveTab] = useState('messages');
@@ -23,14 +24,42 @@ const HomePage = ({navigation}) => {
   const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [conversationNames, setConversationNames] = useState({});
 
   useEffect(() => {
-    const fetchConversations = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
         const response = await ApiService.getAllConversations();
         if (response && response.data) {
           setConversations(response.data);
+          
+          // Lấy tên cho tất cả các cuộc trò chuyện
+          const names = {};
+          const currentUserId = await AsyncStorage.getItem('id');
+          
+          // const allUsersResponse = await ApiService.getAllUser();
+          // const allUsers = allUsersResponse.data; // Giả sử data chứa danh sách users
+
+          for (const conversation of response.data) {
+            if (conversation.isGroup) {
+              names[conversation.id] = conversation.name || 'Nhóm không tên';
+            } else {
+              const otherMember = conversation.users?.find(
+                member => member.id !== currentUserId
+              );
+              
+              if (otherMember) {
+                // Tìm user trong danh sách allUsers đã lấy trước đó
+                //const user = allUsers.find(u => u.id === otherMember.userId);
+                names[conversation.id] = otherMember?.name || 'Người dùng';
+              } else {
+                names[conversation.id] = 'Người dùng';
+              }
+            }
+          }
+          
+          setConversationNames(names);
         }
       } catch (err) {
         setError(err.message || 'Không thể tải danh sách trò chuyện');
@@ -40,7 +69,7 @@ const HomePage = ({navigation}) => {
       }
     };
 
-    fetchConversations();
+    fetchData();
   }, []);
 
   const formatDate = (dateString) => {
@@ -49,20 +78,7 @@ const HomePage = ({navigation}) => {
     return `${date.getDate()}/${date.getMonth() + 1}`;
   };
 
-  const getConversationName = (conversation) => {
-    if (conversation.isGroup) {
-      return conversation.name || 'Nhóm không tên';
-    } else {
-      // Trường hợp không phải nhóm, hiển thị tên người dùng khác trong cuộc trò chuyện
-      // Bạn cần thêm logic để lấy tên người dùng khác ở đây
-      // Ví dụ: lọc ra user khác với user hiện tại
-      return 'Người dùng cá nhân'; // Tạm thời để như vậy, bạn cần cập nhật
-    }
-  };
-
   const getAvatar = (conversation) => {
-    // Nếu là nhóm hoặc chưa có avatar, trả về avatar mặc định
-    // Bạn có thể thêm logic để lấy avatar của người dùng khác nếu là chat cá nhân
     return conversation.isGroup 
       ? 'https://i.pravatar.cc/100?img=3' 
       : 'https://i.pravatar.cc/100?img=1';
@@ -76,11 +92,10 @@ const HomePage = ({navigation}) => {
       <Image source={{ uri: getAvatar(item) }} style={styles.avatar} />
       <View style={styles.chatInfo}>
         <View style={styles.chatHeader}>
-          <Text style={styles.chatName}>{getConversationName(item)}</Text>
+          <Text style={styles.chatName}>{conversationNames[item.id] || 'Đang tải...'}</Text>
           <Text style={styles.chatDate}>{formatDate(item.lastMessageAt)}</Text>
         </View>
         <Text style={styles.lastMessage} numberOfLines={1}>
-          {/* Bạn có thể thêm logic hiển thị tin nhắn cuối cùng ở đây */}
           {item.lastMessage || 'Bắt đầu trò chuyện'}
         </Text>
       </View>

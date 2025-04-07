@@ -3,7 +3,7 @@ import { message } from 'antd-mobile';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 //import { BASE_URL } from "./env"; 
 import { Toast } from 'antd-mobile';
-const BASE_URL = 'http://localhost:8080/api';
+const BASE_URL = 'http://192.168.1.2:8080/api';
 
 
 export default class ApiService {
@@ -31,7 +31,7 @@ export default class ApiService {
     try {
       console.log("Dữ liệu gửi đi:", JSON.stringify(loginDetails));
       const response = await axios.post(
-        `http://localhost:8080/api/auth/login`,
+        `${BASE_URL}/auth/login`,
         loginDetails
       );
       console.log("Phản hồi API:", response.data);
@@ -46,7 +46,7 @@ export default class ApiService {
   // register
   static async register(formDataToSend) {
     try {
-        const apiUrl = "http://localhost:8080/api/auth/register";
+        const apiUrl = `${BASE_URL}/auth/register`;
 
         const response = await axios.post(apiUrl, formDataToSend, {
             headers: { "Content-Type": "multipart/form-data" }
@@ -66,7 +66,7 @@ export default class ApiService {
   static async resetPassword(resetPasswordDetails) {
     try {
       const response = await axios.post(
-        `http://localhost:8080/api/auth/resetPassword`,
+        `${BASE_URL}/auth/resetPassword`,
         resetPasswordDetails
       );
       Toast.show({
@@ -84,7 +84,7 @@ export default class ApiService {
       console.log("Dữ liệu gửi đi:", email);
       console.log(mode)
       const response = await axios.post(
-        `http://localhost:8080/api/otp/send?mode=${mode}`,
+        `${BASE_URL}/otp/send?mode=${mode}`,
         {
           email: email
         }
@@ -124,32 +124,49 @@ export default class ApiService {
       throw error;
     }
   }
+
+  //get infor user
+  static async getUserInfo(userId) {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.get(`${BASE_URL}/users/${userId}`, {
+        headers: headers,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user info:', error);
+      throw error;
+    }
+  }
+
   
 
 
-  // // USER
+  // USER
 
-  // static async getAllUser() {
-  //   try {
-  //     const response = await axios.get(`${this.BASE_URL}/users/get-all`, {
-  //       headers: this.getHeader()
-  //     });
-  //     return response.data;
-  //   } catch (error) {
-  //     message.error('Lỗi khi lấy thông tin all user:', error);
-  //   }
-  // }
+  static async getAllUser() {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.get(`${BASE_URL}/users/get-all`, {
+        headers: headers,
+      });
+      return response.data;
+    } catch (error) {
+      message.error('Lỗi khi lấy thông tin all user:', error);
+    }
+  }
 
-  // static async getPhoneLogin() {
-  //   try {
-  //     const response = await axios.get(`${this.BASE_URL}/users/get-phone`, {
-  //       headers: this.getHeader()
-  //     });
-  //     return response.data;
-  //   } catch (error) {
-  //     message.error('Lỗi khi lấy thông tin phone user:', error);
-  //   }
-  // }
+  static async getPhoneLogin() {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.get(`${this.BASE_URL}/users/get-phone`, {
+        headers: headers
+      });
+      return response.data;
+    } catch (error) {
+      message.error('Lỗi khi lấy thông tin phone user:', error);
+    }
+  }
 
   // // CONVERSSTION
 
