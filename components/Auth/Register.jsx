@@ -5,14 +5,17 @@ import {
   TextInput, 
   TouchableOpacity, 
   StyleSheet,
-  SafeAreaView
+  SafeAreaView,
+  Platform,
+  Alert
 } from 'react-native';
 import useEmailValidation from '../../hook/useEmailValidation';
 import { useNavigation } from '@react-navigation/native';
 import { useRoute } from '@react-navigation/native';
 import ApiService from '../../services/apis';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Toast } from 'antd-mobile';
+import Toast from 'react-native-toast-message';
+import { message } from 'antd-mobile';
 import { useEffect } from 'react';
 
 const Register = ({ navigation }) => {
@@ -41,24 +44,46 @@ const Register = ({ navigation }) => {
 
   // Hàm gửi OTP
   const handleSendOTP = async () => {
-    
     setIsLoading(true);
+  
+    // const showToast = (type, msg) => {
+    //   if (Platform.OS === 'web') {
+    //     if (type === 'success') message.success(msg);
+    //     else message.error(msg);
+    //   } else {
+    //     Toast.show({ type, text1: msg });
+    //   }
+    // };
+  
     try {
+      console.log('Before API call');
       const response = await ApiService.sendOTP(email, mode);
+      console.log('API response:', response);
+  
       if (response?.code === 200) {
-        Toast.show({
-          icon : 'success',
-          content : response.message
-        })
+        console.log('Storing email and navigating...');
         await AsyncStorage.setItem("email", email);
         setConfirmation(true);
+        
         const serverOtp = response.data.otp;
-        nav.navigate('EmailVerification',{serverOtp: serverOtp,mode: 'register'});
+        if (!navigation) {
+          throw new Error('Navigation is not available');
+        }
+        nav.navigate('EmailVerification', {
+          serverOtp,
+          mode: 'register'
+        });
+      } else if(response?.code === 409) {
+        Alert.alert('Lỗi', response.data.message || 'Có lỗi xảy ra');
       }
+    } catch (error) {
+      console.error('Full error:', error);
+      Alert.alert('Lỗi ', 'Email đã tồn tại!');
     } finally {
       setIsLoading(false);
     }
   };
+  
   
 
   return (
@@ -117,12 +142,14 @@ const Register = ({ navigation }) => {
         <TouchableOpacity 
           style={[
             styles.continueButton,
-            (!termsAccepted || !socialTermsAccepted || !email || !isValid) && styles.continueButtonDisabled
+            (!termsAccepted || !socialTermsAccepted || !email || !isValid || isLoading) && styles.continueButtonDisabled
           ]}
-          disabled={!termsAccepted || !socialTermsAccepted || !email || !isValid}
+          disabled={!termsAccepted || !socialTermsAccepted || !email || !isValid || isLoading}
           onPress={handleSendOTP}
         >
-          <Text style={styles.continueButtonText}>Tiếp tục</Text>
+          <Text style={styles.continueButtonText}>
+            {isLoading ? 'Đang xử lý...' : 'Tiếp tục'}
+          </Text>
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.loginLink} onPress={() => nav.navigate('Login')}>

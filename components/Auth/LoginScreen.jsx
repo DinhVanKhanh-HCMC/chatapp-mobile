@@ -7,7 +7,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   StatusBar,
-  Platform
+  Platform,
+  Alert
 } from 'react-native';
 import { ChevronLeft } from 'react-native-feather';
 // import LinearGradient from 'react-native-linear-gradient';
@@ -16,7 +17,7 @@ import { useNavigation } from '@react-navigation/native';
 import useBackHandler from '../../hook/useBackHandle';
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import ApiService from '../../services/apis';
-import { Toast } from 'antd-mobile';
+
 
 
 
@@ -59,10 +60,7 @@ export default function LoginScreen({navigation}) {
       // Chuyển hướng người dùng đến trang "UserScreen"
       nav.navigate('Home');
     } catch (error) {
-      Toast.show({
-        icon : 'error',
-        content : 'Sai tên đăng nhập hoặc mật khẩu!'
-      })
+      Alert.alert('Thông báo','Sai tên đăng nhập hoặc mật khẩu!')
       console.log("Lỗi đăng nhập:", error);
       setError(error.response?.data?.message || "Đăng nhập thất bại");
     } finally {

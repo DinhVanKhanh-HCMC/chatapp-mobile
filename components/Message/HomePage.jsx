@@ -87,7 +87,7 @@ const HomePage = ({navigation}) => {
   const renderChatItem = ({ item }) => (
     <TouchableOpacity 
       style={styles.chatItem}
-      onPress={() => navigation.navigate('Chat', { conversationId: item.id })}
+      onPress={() => navigation.navigate('ChatScreen', { conversationId: item.id })}
     >
       <Image source={{ uri: getAvatar(item) }} style={styles.avatar} />
       <View style={styles.chatInfo}>

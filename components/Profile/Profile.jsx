@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,11 +9,12 @@ import {
   Alert,
   Platform
 } from 'react-native';
-import { ChevronLeft, MessageCircle, Users, User, LogOut } from 'react-native-feather';
+import { ChevronLeft, MessageCircle, Users, User, LogOut, Camera } from 'react-native-feather';
 import { LinearGradient } from 'expo-linear-gradient';
 import BottomMenuBar from '../Sidebar/BottomMenuBar';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import ApiService from '../../services/apis';
 
 const Profile = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('profile');
@@ -65,6 +66,27 @@ const Profile = ({ navigation }) => {
     }
   };
 
+    const [user, setUser] = useState({
+      name: '',
+      imageUrl: '',
+    });
+  
+    useEffect(() => {
+      const fetchUserInfo = async () => {
+        try {
+          const response = await ApiService.getUserInfo();
+          setUser({
+            name: response.data.name,
+            imageUrl: response.data.image,
+          });
+        } catch (error) {
+          console.error('Lỗi khi lấy thông tin người dùng:', error);
+        }
+      };
+  
+      fetchUserInfo();
+    }, []);
+
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
@@ -81,14 +103,14 @@ const Profile = ({ navigation }) => {
 
       <View style={styles.profileSection}>
         <Image
-          source={{ uri: 'https://i.pravatar.cc/100?img=1' }}
+          source={{ uri: user.imageUrl || Camera }}
           style={styles.profileImage}
         />
-        <Text style={styles.profileName}>Văn Khanh Đinh</Text>
+        <Text style={styles.profileName}>{user.name || 'Đang tải...'}</Text>
       </View>
 
       <View style={styles.menuSection}>
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity style={styles.menuItem} onPress={() => nav.navigate('PersonalInfoScreen')}>
           <Text style={styles.menuText}>Thông tin</Text>
         </TouchableOpacity>
 

@@ -1,9 +1,13 @@
 import axios from 'axios';
-import { message } from 'antd-mobile';
+
 import AsyncStorage from "@react-native-async-storage/async-storage";
 //import { BASE_URL } from "./env"; 
-import { Toast } from 'antd-mobile';
+import Toast from 'react-native-toast-message';
+import { message } from 'antd-mobile';
+import axiosInstance from './axiosconfig';
+import { Platform,Alert } from 'react-native';
 const BASE_URL = 'http://192.168.1.2:8080/api';
+
 
 
 export default class ApiService {
@@ -55,10 +59,11 @@ export default class ApiService {
         return response; // Trả về response để xử lý ở handleSubmit
     } catch (error) {
       console.error("❌ Error saving profile:", error.response?.data?.message || error.message);
-      Toast.show({
-          icon : 'error',
-          content : error.response?.data?.message || "Lưu hồ sơ thất bại, vui lòng thử lại"
-      });
+      // Toast.show({
+      //     icon : 'error',
+      //     content : error.response?.data?.message || "Lưu hồ sơ thất bại, vui lòng thử lại"
+      // });
+      Alert.alert('Thông báo','Lưu hồ sơ thất bại')
   }
   };
 
@@ -69,69 +74,83 @@ export default class ApiService {
         `${BASE_URL}/auth/resetPassword`,
         resetPasswordDetails
       );
-      Toast.show({
-        icon : 'success',
-        content : 'Đặt lại mật khẩu thành công!'
-      })
+      Alert.alert('Thông báo', 'Đặt lại mật khẩu thành công!')
       return response.data;
     } catch (error) {
-      Toast.show(err)
+      Alert.alert(error)
     }
   }
 
   static async sendOTP(email, mode) {
     try {
       console.log("Dữ liệu gửi đi:", email);
-      console.log(mode)
+      console.log("Chế độ:", mode);
+  
       const response = await axios.post(
         `${BASE_URL}/otp/send?mode=${mode}`,
-        {
-          email: email
-        }
-        
+        { email }
       );
       return response.data;
     } catch (error) {
-      const errorData = error.response.data;
+      const errorData = error?.response?.data;
+      const showError = (msg) => {
+        if (Platform.OS === 'web') {
+          message.error(msg); // Ant Design
+        } else {
+        
+        }
+      };
+  
       if (errorData?.errors) {
         Object.values(errorData.errors).forEach((err) => {
-          Toast.show(err)
-          console.log(err)
+          console.log(err);
+          showError(err);
         });
       } else {
-        Toast.show({
-          icon: 'fail',
-          content: errorData.message,
-        });
+        showError(errorData?.message || "Có lỗi xảy ra");
       }
+  
+      throw error; // để `handleSendOTP` biết là lỗi
     }
   }
+  
 
   //get conversation
   static async getAllConversations() {
     try {
       const headers = await this.getHeader();
       const response = await axios.get(`${BASE_URL}/conversation`, {
-        headers: headers,
+        headers: headers, 
       });
   
       return response.data; // Trả về danh sách các conversation
     } catch (error) {
-      Toast.show({
-        icon: 'fail',
-        content: 'Không thể lấy danh sách cuộc trò chuyện!',
+      Alert.alert('Lỗi','Không thể lấy danh sách cuộc trò chuyện!')
+      throw error;
+    }
+  }
+
+  //update info
+  static async updateInfo(id,formData) {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.post(`${BASE_URL}/users/update/${id}`,formData, {
+        headers: {headers, "Content-Type": "multipart/form-data" }
       });
+  
+      return response.data; // Trả về danh sách các conversation
+    } catch (error) {
+      Alert.alert('Lỗi','Update không thành công!')
+      console.error("Loi tu server:",error)
       throw error;
     }
   }
 
   //get infor user
-  static async getUserInfo(userId) {
+  static async getUserInfo() {
     try {
       const headers = await this.getHeader();
-      const response = await axios.get(`${BASE_URL}/users/${userId}`, {
-        headers: headers,
-      });
+      const response = await axiosInstance.get(`${BASE_URL}/users/get-phone`);
       return response.data;
     } catch (error) {
       console.error('Error fetching user info:', error);

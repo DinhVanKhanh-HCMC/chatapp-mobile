@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,19 +6,119 @@ import {
   StyleSheet,
   SafeAreaView,
   Image,
+  TextInput,
+  Alert
 } from 'react-native';
 import { X, Camera, Edit2 } from 'react-native-feather';
 import { LinearGradient } from 'expo-linear-gradient';
+import ApiService from '../../services/apis';
+import * as ImagePicker from 'expo-image-picker';
+
 
 const PersonalInfoScreen = ({ navigation }) => {
   const [gender, setGender] = useState('male');
   const [profileImage, setProfileImage] = useState(null);
+  const [editingField, setEditingField] = useState(null);
 
-  const handleSave = () => {
-    // Handle save logic here
-    console.log('Saving profile information');
-    navigation.goBack();
+
+  const [user, setUser] = useState({
+        id: '',
+        name: '',
+        imageUrl: '',
+        dateOfBirth: '',
+      });
+
+  const handleEdit = (field) => {
+    setEditingField(field);
   };
+  
+  const handleChange = (field, value) => {
+    setUser((prevUser) => ({
+      ...prevUser,
+      [field]: value,
+    }));
+  };
+  
+  const handleBlur = () => {
+    setEditingField(null);
+    // Gọi API cập nhật nếu muốn: ApiService.updateUserInfo(user)
+  };
+    
+  useEffect(() => {
+    const fetchUserInfo = async () => {
+      try {
+        const response = await ApiService.getUserInfo();
+        setUser({
+          id: response.data.id,
+          name: response.data.name,
+          imageUrl: response.data.image,
+          dateOfBirth: response.data.dateOfBirth
+        });
+      } catch (error) {
+        console.error('Lỗi khi lấy thông tin người dùng:', error);
+      }
+    };
+
+    fetchUserInfo();
+  }, []);
+
+  const handlePickImage = async () => {
+    // Yêu cầu quyền truy cập thư viện
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('Quyền bị từ chối', 'Bạn cần cấp quyền truy cập để chọn ảnh.');
+      return;
+    }
+  
+    // Mở thư viện ảnh
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [4, 3],
+      quality: 1,
+    });
+  
+    if (!result.canceled) {
+      const selectedAsset = result.assets[0];
+      
+      // Cập nhật vào state để hiển thị trong Image
+      setProfileImage(selectedAsset.uri);
+  
+      // Gửi dữ liệu vào formData
+      setSelectedFile({
+        uri: selectedAsset.uri,
+        type: selectedAsset.type || 'image/jpeg',
+        name: selectedAsset.fileName || `image_${Date.now()}.jpg`,
+      });
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      // Gọi API update, ví dụ hàm này nhận id và thông tin user
+      const formData = new FormData();
+      formData.append('name', user.name);
+      formData.append('dateOfBirth', user.dateOfBirth);
+      formData.append('gender', 'male');
+
+      if (profileImage && profileImage !== user.imageUrl) {
+        formData.append('image', {
+          uri: profileImage,
+          name: 'profile.jpg',
+          type: 'image/jpeg',
+        });
+      }
+      await ApiService.updateInfo(user.id, formData);
+      Alert.alert('Thông báo','Cập nhật thông tin thành công!')
+      // Sau khi update thành công, thoát khỏi chế độ chỉnh sửa
+      setEditingField(null);
+      // Optionally, hiện thông báo thành công cho người dùng
+    } catch (error) {
+      console.error("Lỗi cập nhật thông tin người dùng:", error);
+      // Optionally, xử lý lỗi (hiển thị thông báo lỗi)
+    }
+  };
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -37,32 +137,56 @@ const PersonalInfoScreen = ({ navigation }) => {
 
       <View style={styles.content}>
         <View style={styles.profileImageContainer}>
-          {profileImage ? (
-            <Image source={{ uri: profileImage }} style={styles.profileImage} />
-          ) : (
-            <View style={styles.profileImagePlaceholder}>
-              <Camera width={32} height={32} color="#666" />
-            </View>
-          )}
-          <TouchableOpacity style={styles.cameraButton}>
+
+            {profileImage ? (
+                        <Image source={{ uri: profileImage }} style={styles.profileImage} />
+                      ) : (
+                        <Image source={{ uri: user.imageUrl || Camera }} style={styles.profileImage} />
+              )}
+            
+          <TouchableOpacity style={styles.cameraButton} onPress={handlePickImage}>
             <Camera width={20} height={20} color="#666" />
           </TouchableOpacity>
         </View>
 
         <View style={styles.infoSection}>
+          {/* Name */}
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>Văn Khanh Định</Text>
-            <TouchableOpacity>
+            {editingField === 'name' ? (
+              <TextInput
+                style={styles.input}
+                value={user.name}
+                onChangeText={(text) => handleChange('name', text)}
+                onBlur={handleBlur}
+                autoFocus
+              />
+            ) : (
+              <Text style={styles.infoLabel}>{user.name}</Text>
+            )}
+            <TouchableOpacity onPress={() => handleEdit('name')}>
               <Edit2 width={20} height={20} color="#666" />
             </TouchableOpacity>
           </View>
 
+          {/* Date of Birth */}
           <View style={styles.infoRow}>
-            <Text style={styles.infoLabel}>13/06/2003</Text>
-            <TouchableOpacity>
+            {editingField === 'dateOfBirth' ? (
+              <TextInput
+                style={styles.input}
+                value={user.dateOfBirth}
+                onChangeText={(text) => handleChange('dateOfBirth', text)}
+                onBlur={handleBlur}
+                autoFocus
+              />
+            ) : (
+              <Text style={styles.infoLabel}>{user.dateOfBirth}</Text>
+            )}
+            <TouchableOpacity onPress={() => handleEdit('dateOfBirth')}>
               <Edit2 width={20} height={20} color="#666" />
             </TouchableOpacity>
           </View>
+
+          
 
           <View style={styles.genderContainer}>
             <TouchableOpacity 

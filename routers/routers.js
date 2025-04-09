@@ -13,6 +13,8 @@ import HomePage from "../components/Message/HomePage";
 import Contact from "../components/Contact/Contact";
 import Profile from "../components/Profile/Profile";
 import UserProfileScreen from "../components/Auth/UserProfileScreen";
+import PersonalInfoScreen from "../components/Profile/PersonalInfoScreen";
+import ChatScreen from "../components/Message/ChatScreen";
 
 const Stack = createStackNavigator();
 
@@ -37,6 +39,8 @@ const routers = () => {
       <Stack.Screen name="Home" component={withAuth(HomePage)} options={{ headerShown: false }}/>
       <Stack.Screen name="Contact" component={withAuth(Contact)} options={{ headerShown: false }}/>
       <Stack.Screen name="Profile" component={withAuth(Profile)} options={{ headerShown: false }}/>
+      <Stack.Screen name="PersonalInfoScreen" component={withAuth(PersonalInfoScreen)} options={{ headerShown: false }}/>
+      <Stack.Screen name="ChatScreen" component={withAuth(ChatScreen)} options={{ headerShown: false }}/>
     </Stack.Navigator>
   );
 };

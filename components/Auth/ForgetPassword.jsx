@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
+  Alert
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import useEmailValidation from '../../hook/useEmailValidation';
@@ -36,10 +37,7 @@ const ForgetPassword = ({ navigation }) => {
     try {
       const response = await ApiService.sendOTP(email, mode);
       if (response?.code === 200) {
-        Toast.show({
-          icon : 'success',
-          content : response.message
-        })
+        Alert.alert(response.message)
         await AsyncStorage.setItem("email", email);
         setConfirmation(true);
         const serverOtp = response.data.otp;

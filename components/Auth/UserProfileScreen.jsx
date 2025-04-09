@@ -9,10 +9,10 @@ import {
   ScrollView,
   Platform,
   Image,
+  Alert,
+  Modal
 } from 'react-native';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { LinearGradient } from 'expo-linear-gradient';
-import DatePicker from 'react-datepicker';
 import ApiService from '../../services/apis';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -20,20 +20,27 @@ import "react-datepicker/dist/react-datepicker.css";
 import { Toast } from 'antd-mobile';
 import {Camera} from 'react-native-feather';
 import * as ImagePicker from 'expo-image-picker';
+import { format } from 'date-fns';
+import { vi } from 'date-fns/locale';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 
-const UserProfileScreen = ({ navigation }) => {
+
+const UserProfileScreen = ({ navigation,onDateChange }) => {
   const [displayName, setDisplayName] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [gender, setGender] = useState('');
-  const [dateOfBirth, setDateOfBirth] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [dateOfBirth, setDateOfBirth] = useState(null);
+  const [showPicker, setShowPicker] = useState(false);
   const [avatarUri, setAvatarUri] = useState('');
   const nav = useNavigation();
   const [selectedFile, setSelectedFile] = useState(null);
   const [profileImage, setProfileImage] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(null);
+  const [date, setDate] = useState(new Date(2000, 0, 1));
+  const [isAndroidModalVisible, setIsAndroidModalVisible] = useState(false);
 
   const handleContinue = () => {
     // Handle form submission logic here
@@ -74,17 +81,57 @@ const UserProfileScreen = ({ navigation }) => {
     }));
   };
 
+  const handleChangeDate = (event, selectedDate) => {
+    setShowDatePicker(Platform.OS === 'ios');
+    if (selectedDate) {
+      setDateOfBirth(selectedDate);
+    }
+  };
+  
+  const formatDateForAPI = (date) => {
+    if (!date) return null;
+    return date.toISOString().split('T')[0]; // Format: YYYY-MM-DD
+  };
+
 
 
   
 
   const handleDateChange = (event, selectedDate) => {
-    if (selectedDate) {
-      setShowDatePicker(false); // Ẩn DatePicker (trên mobile)
-      const formattedDate = selectedDate.toISOString().split("T")[0]; // Định dạng YYYY-MM-DD
-      setFormData((prev) => ({ ...prev, dateOfBirth: formattedDate }));
+    if (Platform.OS === 'android') {
+      setIsAndroidModalVisible(false);
     }
-  }
+    
+    const currentDate = selectedDate || date;
+    setShowPicker(Platform.OS === 'ios');
+    setDate(currentDate);
+    
+    if (onDateChange) {
+      onDateChange(currentDate);
+    }
+
+    // Cập nhật ngày sinh vào formData
+    setFormData(prev => ({
+      ...prev,
+      dateOfBirth: currentDate, // Hoặc: currentDate.toISOString()
+    }));
+
+    // Gọi callback nếu có
+    if (onDateChange) {
+      onDateChange(currentDate);
+    }
+  };
+  const displayDate = format(date, 'dd/MM/yyyy', { locale: vi });
+
+  const showDatePicker = () => {
+    if (Platform.OS === 'android') {
+      setIsAndroidModalVisible(true);
+    } else {
+      setShowPicker(true);
+    }
+  };
+
+
   //chuyển đổi kiểu Base64 thành Blob
   const dataURLtoBlob = (dataURL) => {
     const arr = dataURL.split(',');
@@ -100,48 +147,94 @@ const UserProfileScreen = ({ navigation }) => {
 
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
+    console.log("===> Bắt đầu handleSubmit");
+
+    if (e && e.preventDefault) {
+        e.preventDefault();
+        console.log("===> Đã gọi e.preventDefault()");
+    }
+
+    console.log("===> formData hiện tại:", formData);
+
+    // Kiểm tra và format lại ngày sinh trước khi gửi
+    let formattedDateOfBirth = null;
+    if (formData.dateOfBirth) {
+        // Nếu dateOfBirth là string (từ DateTimePicker), chuyển thành Date object trước
+        const dateObj = typeof formData.dateOfBirth === 'string' 
+            ? new Date(formData.dateOfBirth) 
+            : formData.dateOfBirth;
+        
+        // Format thành YYYY-MM-DD (định dạng LocalDate Java)
+        formattedDateOfBirth = dateObj.toISOString().split('T')[0];
+        console.log("===> Ngày sinh sau khi format:", formattedDateOfBirth);
+    }
 
     const formDataToSend = new FormData();
     formDataToSend.append("name", formData.displayName);
     formDataToSend.append("phoneNumber", formData.phoneNumber);
     formDataToSend.append("email", formData.email);
     formDataToSend.append("password", formData.password);
-    formDataToSend.append("dateOfBirth", formData.dateOfBirth);
+    formDataToSend.append("dateOfBirth", formattedDateOfBirth); // Sử dụng ngày đã format
     formDataToSend.append("gender", formData.gender);
 
-    if (selectedFile) {
-        console.log("Selected File: ", selectedFile);
-        const blob = dataURLtoBlob(selectedFile.uri);
-        formDataToSend.append("image", blob, selectedFile.name);
+    console.log("===> Đã append các trường cơ bản vào FormData");
+
+    // Xử lý file ảnh
+    if (selectedFile && selectedFile.uri) {
+        console.log("===> Selected File:", selectedFile);
+
+        try {
+            // Tạo object file với các thuộc tính cần thiết
+            const imageFile = {
+                uri: selectedFile.uri,
+                type: selectedFile.type || 'image/jpeg',
+                name: selectedFile.name || `profile_${Date.now()}.jpg`,
+            };
+            
+            // Append file vào FormData
+            formDataToSend.append("image", imageFile);
+            console.log("===> Đã append image vào FormData:", imageFile);
+        } catch (fileError) {
+            console.error("❌ Lỗi khi xử lý file ảnh:", fileError);
+            Alert.alert('Lỗi', 'Không thể xử lý ảnh đại diện');
+            return;
+        }
+    } else {
+        console.log("===> Không có ảnh được chọn");
     }
 
     try {
-        const response = await ApiService.register(formDataToSend);
-        console.log("api xu ly xong");
-        console.log(""+response.data.code);
-        console.log(""+response.data.message);
+        console.log("===> Gọi API đăng ký với FormData:", formDataToSend);
         
-        if (response.status === 201 ||  response.data.code === 200) {
-          Toast.show({
-            icon : 'success',
-            content : "Hồ sơ đã được lưu thành công!"
-          })
+        // Gọi API với headers multipart/form-data
+        const response = await ApiService.register(formDataToSend);
+        console.log("===> Phản hồi từ API:", response);
+
+        if (response?.status === 201 || response?.data?.code === 200) {
+            Alert.alert('Thành công', 'Đăng ký tài khoản thành công');
             nav.navigate("Login");
-        }else{
-          Toast.show({
-            icon : 'error',
-            content : "Đăng ký thất bại: "+response.data.message
-          })
+        } else {
+            const errorMsg = response?.data?.message || 'Không rõ lỗi';
+            console.error("Lỗi từ server:", errorMsg);
+            Alert.alert('Lỗi', `Đăng ký thất bại: ${errorMsg}`);
         }
     } catch (error) {
-      console.log(error)
-      Toast.show({
-        icon : 'error',
-        content : "Lưu hồ sơ thất bại, vui lòng thử lại"
-      })
+        console.error("❌ Lỗi khi gọi API:", error);
+        
+        // Xử lý lỗi chi tiết hơn
+        let errorMessage = 'Đăng ký thất bại, vui lòng thử lại';
+        if (error.response) {
+            if (error.response.data?.errors) {
+                errorMessage = Object.values(error.response.data.errors).join('\n');
+            } else if (error.response.data?.message) {
+                errorMessage = error.response.data.message;
+            }
+        }
+        
+        Alert.alert('Lỗi', errorMessage);
     }
 };
+
 
 const handlePickImage = async () => {
   // Yêu cầu quyền truy cập thư viện
@@ -181,6 +274,7 @@ const handlePickImage = async () => {
   formData.password.trim() !== "" && 
   confirmPassword.trim() !== "" && 
   formData.gender;
+
 
   return (
     <SafeAreaView style={styles.container}>
@@ -274,83 +368,63 @@ const handlePickImage = async () => {
           </TouchableOpacity>
         </View>
 
-        <View style={styles.dateContainer}>
-        <Text >Ngày sinh:</Text>
-        {Platform.OS === 'web' ? (
-          <DatePicker
-            selected={formData.dateOfBirth ? new Date(formData.dateOfBirth) : null}
-            onChange={(date) => handleDateChange(null, date)}
-            dateFormat="dd/MM/yyyy"
-            customInput={
-              <input
-                style={{
-                  ...styles.datePickerButtonText,
-                  border: 'none',
-                  outline: 'none',
-                  width: '100%',
-                  backgroundColor: 'transparent',
-                }}
-              />
-            }
-          />
-        ) : (
-        <>
-            <TouchableOpacity
-              style={styles.datePickerButton}
-              onPress={() => setShowDatePicker(true)}
-            >
-              <Text style={styles.datePickerButtonText}>
-                {formData.dateOfBirth
-                  ? new Date(formData.dateOfBirth).toLocaleDateString('vi-VN')
-                  : "Chọn ngày"}
-              </Text>
-            </TouchableOpacity>
+        <View style={styles.container}>
+      <Text style={styles.label}>Ngày sinh:</Text>
+      
+      <TouchableOpacity 
+        style={styles.dateInput} 
+        onPress={showDatePicker}
+        activeOpacity={0.7}
+      >
+        <Text style={styles.dateText}>{displayDate}</Text>
+      </TouchableOpacity>
 
-            {showDatePicker && (
+      {Platform.OS === 'android' && isAndroidModalVisible && (
+        <Modal
+          transparent={true}
+          animationType="slide"
+          onRequestClose={() => setIsAndroidModalVisible(false)}
+        >
+          <View style={styles.androidPickerContainer}>
+            <View style={styles.androidPicker}>
               <DateTimePicker
-                value={formData.dateOfBirth ? new Date(formData.dateOfBirth) : new Date()}
+                value={date}
                 mode="date"
-                display="default"
+                display="spinner"
                 onChange={handleDateChange}
+                maximumDate={new Date()}
+                locale="vi-VN"
               />
-            )}
-          </>
-        )}
-        </View>
+              <TouchableOpacity
+                style={styles.confirmButton}
+                onPress={() => setIsAndroidModalVisible(false)}
+              >
+                <Text style={styles.confirmButtonText}>Xác nhận</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
 
-        {/* <TouchableOpacity
-          style={styles.datePickerButton}
-          onPress={() => setShowDatePicker(true)}
-        >
-          <Text style={styles.datePickerButtonText}>
-            {dateOfBirth.toLocaleDateString('vi-VN')}
-          </Text>
-        </TouchableOpacity>
-
-        {showDatePicker && (
+      {Platform.OS === 'ios' && showPicker && (
+        <View style={styles.iosPickerContainer}>
+          <View style={styles.iosPickerHeader}>
+            <TouchableOpacity onPress={() => setShowPicker(false)}>
+              <Text style={styles.doneButton}>Xong</Text>
+            </TouchableOpacity>
+          </View>
           <DateTimePicker
-            value={dateOfBirth}
+            value={date}
             mode="date"
-            display="default"
+            display="spinner"
             onChange={handleDateChange}
+            maximumDate={new Date()}
+            locale="vi-VN"
+            textColor="#000"
           />
-        )} */}
-
-        {/* chon anh */}
-        {/* <TouchableOpacity
-          style={styles.imagePickerButton}
-          onPress={handleImagePick}
-        >
-          <Text style={styles.imagePickerButtonText}>
-            {avatarUri ? 'Ảnh đã chọn' : 'Chọn ảnh đại diện'}
-          </Text>
-        </TouchableOpacity>
-
-        {avatarUri && (
-          <Text style={styles.imageUriText}>
-            URI ảnh: {avatarUri}
-          </Text>
-        )} */}
+        </View>
+      )}
+    </View>
 
         <TouchableOpacity 
           style={[styles.continueButton, !isValidForm && styles.continueButtonDisabled]}
@@ -510,6 +584,74 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: '#ddd',
+  },
+  dateButton: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: '#f9f9f9',
+  },
+  dateText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  dateInput: {
+    borderWidth: 1,
+    borderColor: '#ccc',
+    borderRadius: 8,
+    padding: 15,
+    backgroundColor: '#fff',
+  },
+  dateText: {
+    fontSize: 16,
+    color: '#333',
+  },
+  androidPickerContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  androidPicker: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 16,
+  },
+  confirmButton: {
+    backgroundColor: '#0088ff',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  confirmButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  iosPickerContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  iosPickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#eee',
+  },
+  doneButton: {
+    color: '#0088ff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

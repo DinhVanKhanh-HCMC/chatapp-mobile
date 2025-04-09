@@ -6,12 +6,13 @@ import {
   TouchableOpacity,
   StyleSheet,
   SafeAreaView,
+  Alert
 } from 'react-native';
 import useBackHandler from '../../hook/useBackHandle';
 import { useNavigation } from '@react-navigation/native';
 import { showMessage } from 'antd-mobile';
 import { useRoute } from '@react-navigation/native';
-import {Toast} from 'antd-mobile';
+import {Toast} from 'react-native-toast-message';
 
 
 
@@ -66,10 +67,12 @@ const EmailVerification = ({ navigation }) => {
       return;
     }
     if (otp === serverOtp) {
-      Toast.show({
-        icon: 'success',
-        content: 'Xác thực OTP thành công!'
-      });
+      // Toast.show({
+      //   icon: 'success',
+      //   content: 'Xác thực OTP thành công!'
+      // });
+
+      Alert.alert('Thông báo','Xác thực thành công')
       if (mode === 'register') {
         nav.navigate("RegisProfile")
       } else if (mode === 'reset') {

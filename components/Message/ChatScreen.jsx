@@ -8,7 +8,8 @@ import {
   SafeAreaView,
   FlatList,
   Image,
-  
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { 
   ChevronLeft,
@@ -148,7 +149,6 @@ const ChatScreen = ({ navigation, route }) => {
 
   const sendMessage = () => {
     if (message.trim()) {
-      // Handle sending message
       console.log('Sending message:', message);
       setMessage('');
     }
@@ -184,42 +184,52 @@ const ChatScreen = ({ navigation, route }) => {
         </View>
       </LinearGradient>
 
-      <FlatList
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={item => item.id}
-        style={styles.messageList}
-        inverted
-      />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.flex}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
+        <View style={styles.messagesContainer}>
+          <FlatList
+            data={messages}
+            renderItem={renderMessage}
+            keyExtractor={item => item.id}
+            style={styles.messageList}
+            contentContainerStyle={styles.messageContent}
+            inverted
+            showsVerticalScrollIndicator={false}
+          />
+        </View>
 
-      <View style={styles.inputContainer}>
-        <TouchableOpacity style={styles.inputButton}>
-          <Smile stroke="#666" width={24} height={24} />
-        </TouchableOpacity>
-        
-        <TextInput
-          style={styles.input}
-          placeholder="Tin nhắn"
-          value={message}
-          onChangeText={setMessage}
-          multiline
-        />
-
-        {message.trim() ? (
-          <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
-            <Send stroke="#0088ff" width={24} height={24} />
+        <View style={styles.inputContainer}>
+          <TouchableOpacity style={styles.inputButton}>
+            <Smile stroke="#666" width={24} height={24} />
           </TouchableOpacity>
-        ) : (
-          <View style={styles.attachmentButtons}>
-            <TouchableOpacity style={styles.inputButton}>
-              <File stroke="#666" width={24} height={24} />
+          
+          <TextInput
+            style={styles.input}
+            placeholder="Tin nhắn"
+            value={message}
+            onChangeText={setMessage}
+            multiline
+          />
+
+          {message.trim() ? (
+            <TouchableOpacity style={styles.sendButton} onPress={sendMessage}>
+              <Send stroke="#0088ff" width={24} height={24} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.inputButton}>
-              <ImageIcon stroke="#666" width={24} height={24} />
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
+          ) : (
+            <View style={styles.attachmentButtons}>
+              <TouchableOpacity style={styles.inputButton}>
+                <File stroke="#666" width={24} height={24} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.inputButton}>
+                <ImageIcon stroke="#666" width={24} height={24} />
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -227,9 +237,10 @@ const ChatScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    width: '100%',
-    height: '100%',
     backgroundColor: '#f0f0f0',
+  },
+  flex: {
+    flex: 1,
   },
   header: {
     paddingTop: 20,
@@ -246,6 +257,7 @@ const styles = StyleSheet.create({
   headerInfo: {
     flex: 1,
     marginLeft: 8,
+  justifyContent: 'center',
   },
   headerName: {
     fontSize: 18,
@@ -264,9 +276,15 @@ const styles = StyleSheet.create({
     padding: 8,
     marginLeft: 8,
   },
+  messagesContainer: {
+    flex: 1,
+  },
   messageList: {
     flex: 1,
-    padding: 16,
+  },
+  messageContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
   messageContainer: {
     flexDirection: 'row',
@@ -352,6 +370,8 @@ const styles = StyleSheet.create({
     padding: 8,
     maxHeight: 100,
     fontSize: 16,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 20,
   },
   attachmentButtons: {
     flexDirection: 'row',
