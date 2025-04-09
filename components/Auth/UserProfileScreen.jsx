@@ -41,6 +41,7 @@ const UserProfileScreen = ({ navigation,onDateChange }) => {
   const [selectedDate, setSelectedDate] = useState(null);
   const [date, setDate] = useState(new Date(2000, 0, 1));
   const [isAndroidModalVisible, setIsAndroidModalVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); 
 
   const handleContinue = () => {
     // Handle form submission logic here
@@ -147,6 +148,9 @@ const UserProfileScreen = ({ navigation,onDateChange }) => {
 
 
   const handleSubmit = async (e) => {
+
+
+    setIsLoading(true)
     console.log("===> Bắt đầu handleSubmit");
 
     if (e && e.preventDefault) {
@@ -232,6 +236,8 @@ const UserProfileScreen = ({ navigation,onDateChange }) => {
         }
         
         Alert.alert('Lỗi', errorMessage);
+    }finally{
+      setIsLoading(false)
     }
 };
 
@@ -427,11 +433,11 @@ const handlePickImage = async () => {
     </View>
 
         <TouchableOpacity 
-          style={[styles.continueButton, !isValidForm && styles.continueButtonDisabled]}
-          disabled={!isValidForm}
+          style={[styles.continueButton, (!isValidForm || isLoading) && styles.continueButtonDisabled]}
+          disabled={!isValidForm || isLoading}
           onPress={handleSubmit}
         >
-          <Text style={styles.continueButtonText}>Tiếp tục</Text>
+          <Text style={styles.continueButtonText}>{isLoading? 'Đang xử lý...' : 'Tiếp tục'}</Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>

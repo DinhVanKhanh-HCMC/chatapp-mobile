@@ -132,11 +132,11 @@ export default function LoginScreen({navigation}) {
           onPress={handleLogin}
           style={[
             styles.loginButton,
-            (!formData.phoneNumber || !formData.password) && styles.loginButtonDisabled
+            (!formData.phoneNumber || !formData.password || isLoading) && styles.loginButtonDisabled
           ]}
-          disabled={!formData.phoneNumber || !formData.password}
+          disabled={!formData.phoneNumber || !formData.password || isLoading}
         >
-          <Text style={styles.loginButtonText}>Đăng nhập</Text>
+          <Text style={styles.loginButtonText}>{isLoading? 'Đang xử lý' : 'Đăng nhập'}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

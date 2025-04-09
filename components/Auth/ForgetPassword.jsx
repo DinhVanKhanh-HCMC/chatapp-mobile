@@ -33,7 +33,7 @@ const ForgetPassword = ({ navigation }) => {
   // ham gui otp
   const handleSendOTP = async () => {
     
-    //setIsLoading(true);
+    setIsLoading(true);
     try {
       const response = await ApiService.sendOTP(email, mode);
       if (response?.code === 200) {
@@ -43,7 +43,10 @@ const ForgetPassword = ({ navigation }) => {
         const serverOtp = response.data.otp;
         nav.navigate('EmailVerification',{serverOtp: serverOtp,mode: 'reset'});
       }
-    } finally {
+    }catch(err){
+      Alert.alert('Lỗi','Email không tồn tại!')
+    }
+     finally {
       setIsLoading(false);
     }
   };
@@ -81,12 +84,12 @@ const ForgetPassword = ({ navigation }) => {
         </View>
 
         <TouchableOpacity 
-          style={[styles.continueButton, (!email || !isValid) && styles.continueButtonDisabled]}
-          disabled={!email || !isValid}
+          style={[styles.continueButton, (!email || !isValid || isLoading) && styles.continueButtonDisabled]}
+          disabled={!email || !isValid || isLoading}
           onPress={handleSendOTP}
           
         >
-          <Text style={styles.continueButtonText}>Tiếp tục</Text>
+          <Text style={styles.continueButtonText}>{ isLoading ? 'Đang xử lý...' : 'Tiếp tục'}</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>

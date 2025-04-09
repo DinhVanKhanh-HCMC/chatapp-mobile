@@ -60,10 +60,7 @@ const EmailVerification = ({ navigation }) => {
   // Hàm xác thực OTP
   const handleVerifyOTP = () => {
     if (otp.trim() === '') {
-      Toast.show({
-        icon: 'error',
-        content: 'Vui lòng nhập OTP!'
-      })
+      Alert.alert('Error','Vui lòng nhập OTP!')
       return;
     }
     if (otp === serverOtp) {
@@ -79,10 +76,7 @@ const EmailVerification = ({ navigation }) => {
         nav.navigate("NewPassword")
       }
     } else {
-      Toast.show({
-        icon: 'error',
-        content: 'Mã OTP không đúng!'
-      })
+      Alert.alert('error','Mã OTP không đúng!')
     }
   };
 

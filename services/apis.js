@@ -58,7 +58,7 @@ export default class ApiService {
 
         return response; // Trả về response để xử lý ở handleSubmit
     } catch (error) {
-      console.error("❌ Error saving profile:", error.response?.data?.message || error.message);
+      //console.error("❌ Error saving profile:", error.response?.data?.message || error.message);
       // Toast.show({
       //     icon : 'error',
       //     content : error.response?.data?.message || "Lưu hồ sơ thất bại, vui lòng thử lại"

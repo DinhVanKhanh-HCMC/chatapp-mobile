@@ -19,6 +19,7 @@ const PersonalInfoScreen = ({ navigation }) => {
   const [gender, setGender] = useState('male');
   const [profileImage, setProfileImage] = useState(null);
   const [editingField, setEditingField] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
 
 
   const [user, setUser] = useState({
@@ -94,6 +95,7 @@ const PersonalInfoScreen = ({ navigation }) => {
   };
 
   const handleSave = async () => {
+    setIsLoading(true)
     try {
       // Gọi API update, ví dụ hàm này nhận id và thông tin user
       const formData = new FormData();
@@ -116,6 +118,8 @@ const PersonalInfoScreen = ({ navigation }) => {
     } catch (error) {
       console.error("Lỗi cập nhật thông tin người dùng:", error);
       // Optionally, xử lý lỗi (hiển thị thông báo lỗi)
+    }finally{
+      setIsLoading(false)
     }
   };
 
@@ -141,7 +145,7 @@ const PersonalInfoScreen = ({ navigation }) => {
             {profileImage ? (
                         <Image source={{ uri: profileImage }} style={styles.profileImage} />
                       ) : (
-                        <Image source={{ uri: user.imageUrl || Camera }} style={styles.profileImage} />
+                        <Image source={{ uri: user.imageUrl }} style={styles.profileImage} />
               )}
             
           <TouchableOpacity style={styles.cameraButton} onPress={handlePickImage}>
@@ -219,8 +223,9 @@ const PersonalInfoScreen = ({ navigation }) => {
           <TouchableOpacity 
             style={styles.saveButton}
             onPress={handleSave}
+            disabled={isLoading}
           >
-            <Text style={styles.saveButtonText}>Lưu</Text>
+            <Text style={styles.saveButtonText}>{isLoading? 'Đang xử lý...' : 'Lưu'}</Text>
           </TouchableOpacity>
         </View>
       </View>
