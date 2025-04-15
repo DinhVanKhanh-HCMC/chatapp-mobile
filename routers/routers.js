@@ -15,6 +15,8 @@ import Profile from "../components/Profile/Profile";
 import UserProfileScreen from "../components/Auth/UserProfileScreen";
 import PersonalInfoScreen from "../components/Profile/PersonalInfoScreen";
 import ChatScreen from "../components/Message/ChatScreen";
+import FriendRequest from "../components/Contact/FriendRequest";
+import CreateGroupScreen from "../components/Pages/CreateGroupScreen";
 
 const Stack = createStackNavigator();
 
@@ -41,6 +43,8 @@ const routers = () => {
       <Stack.Screen name="Profile" component={withAuth(Profile)} options={{ headerShown: false }}/>
       <Stack.Screen name="PersonalInfoScreen" component={withAuth(PersonalInfoScreen)} options={{ headerShown: false }}/>
       <Stack.Screen name="ChatScreen" component={withAuth(ChatScreen)} options={{ headerShown: false }}/>
+      <Stack.Screen name="FriendRequest" component={withAuth(FriendRequest)} options={{ headerShown: false }}/>
+      <Stack.Screen name="CreateGroupScreen" component={withAuth(CreateGroupScreen)} options={{ headerShown: false }}/>
     </Stack.Navigator>
   );
 };

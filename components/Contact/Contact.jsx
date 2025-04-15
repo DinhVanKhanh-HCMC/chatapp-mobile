@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,26 +12,17 @@ import {
 import { Search, Phone, Video, MessageCircle, Users, User, Plus } from 'react-native-feather';
 import { LinearGradient } from 'expo-linear-gradient';
 import BottomMenuBar from '../Sidebar/BottomMenuBar';
+import { useNavigation } from '@react-navigation/native';
+import ApiService from '../../services/apis';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Contact = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('contacts');
   const [searchQuery, setSearchQuery] = useState('');
+  const nav = useNavigation();
+  const [contacts, setContacts] = useState([]);
+  const [currentId, setCurrentId] = useState(null);
 
-  const contacts = [
-    {
-      id: '1',
-      name: 'Anh 3 Thanhhh',
-      avatar: 'https://i.pravatar.cc/100?img=1',
-      online: true,
-    },
-    {
-      id: '2',
-      name: 'Anh Nghĩa Đoàn Xã',
-      avatar: 'https://i.pravatar.cc/100?img=2',
-      online: true,
-    },
-    // Add more contacts as needed
-  ];
 
   const groups = [
     {
@@ -58,22 +49,66 @@ const Contact = ({ navigation }) => {
       id: 'requests',
       icon: 'users',
       title: 'Lời mời kết bạn',
-      subtitle: '(10)',
       color: '#0088ff',
     },
     {
       id: 'phonebook',
       icon: 'book',
       title: 'Danh bạ máy',
-      subtitle: 'Liên hệ có dùng Zalo',
+      subtitle: 'Liên hệ có dùng Zola',
       color: '#0088ff',
     }
   ];
 
+  useEffect(() =>{
+    const fetchData = async () =>{
+      try {
+        const currentUserId = await AsyncStorage.getItem('id');
+        setCurrentId(currentUserId);
+      } catch (error) {
+        console.error(error);
+        
+      }
+    };
+    fetchData();
+  }, []);
+  //hàm xử lý lấy danh sách bạn bè của người dùng hiện tại
+  useEffect(() => {
+    
+    const fetchContacts = async () => {
+      try {
+        const response = await ApiService.getFriendUserLogin();
+        const accepted = response.data.filter(f => f.status === 'ACCEPTED');
+  
+        
+        const contactList = [];
+  
+        for (const friend of accepted) {
+          const convRes = await ApiService.getConversationById(friend.conversationId);
+          const users = convRes.data.users;
+  
+          // Lấy người không phải mình
+          const contact = users.find(u => u.id !== currentId);
+          if (contact) {
+            contactList.push(contact);
+          }
+        }
+  
+        setContacts(contactList); // Gán danh sách user đầy đủ cho component
+      } catch (error) {
+        console.error('Lỗi khi load danh sách bạn bè:', error);
+      }
+    };
+  
+    fetchContacts();
+  }, []);
+  
+
   const renderContactItem = ({ item }) => (
+    <TouchableOpacity>
     <View style={styles.contactItem}>
       <View style={styles.contactInfo}>
-        <Image source={{ uri: item.avatar }} style={styles.avatar} />
+        <Image source={{ uri: item.image || 'https://i.pravatar.cc/100?img=2' }} style={styles.avatar} />
         {item.online && <View style={styles.onlineIndicator} />}
         <Text style={styles.contactName}>{item.name}</Text>
       </View>
@@ -86,10 +121,19 @@ const Contact = ({ navigation }) => {
         </TouchableOpacity>
       </View>
     </View>
+    </TouchableOpacity>
   );
 
   const renderSectionItem = ({ item }) => (
-    <TouchableOpacity style={styles.sectionItem}>
+    <TouchableOpacity style={styles.sectionItem} 
+    onPress={() => {
+      if (item.id === 'requests') {
+        nav.navigate('FriendRequest');
+      } else {
+        // có thể xử lý các id khác nếu cần
+      }
+    }}
+    >
       <View style={[styles.sectionIcon, { backgroundColor: item.color }]}>
         <Users width={24} height={24} stroke="#fff" />
       </View>
@@ -99,6 +143,9 @@ const Contact = ({ navigation }) => {
       </View>
     </TouchableOpacity>
   );
+
+  
+  
 
   const renderGroupItem = ({ item }) => (
     <TouchableOpacity style={styles.groupItem}>
@@ -173,7 +220,7 @@ const Contact = ({ navigation }) => {
         <FlatList
           ListHeaderComponent={() => (
             <View>
-              <TouchableOpacity style={styles.createGroup}>
+              <TouchableOpacity style={styles.createGroup} onPress={() => nav.navigate('CreateGroupScreen')}>
                 <View style={styles.createGroupIcon}>
                   <Plus stroke="#0088ff" width={24} height={24} />
                 </View>

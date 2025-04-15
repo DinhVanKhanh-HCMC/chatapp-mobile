@@ -15,10 +15,12 @@ import BottomMenuBar from '../Sidebar/BottomMenuBar';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ApiService from '../../services/apis';
+import { useWebSocket } from '../Message/WebSocketContext';
 
 const Profile = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('profile');
   const nav = useNavigation();
+  const {disconnect} = useWebSocket();
 
   const clearTokens = async () => {
     try {
@@ -31,15 +33,15 @@ const Profile = ({ navigation }) => {
     }
   };
 
-  const handleLogout = () => {
+  const handleLogout = async() => {
     if (Platform.OS === 'web') {
-      // Sử dụng window.confirm cho web
-      const confirmLogout = window.confirm('Bạn có chắc chắn muốn đăng xuất?');
-      if (confirmLogout) {
-        clearTokens();
+      const shouldLogout = window.confirm('Bạn có chắc chắn muốn đăng xuất?');
+      if (shouldLogout){
+        await disconnect();
+        await clearTokens();
+        console.log('User logged out on mobile');
+        await ApiService.logoutApi()
         nav.navigate("Login");
-        console.log('User logged out on web');
-        
       }
     } else {
       // Sử dụng Alert cho mobile
@@ -54,9 +56,11 @@ const Profile = ({ navigation }) => {
           {
             text: 'Đăng xuất',
             style: 'destructive',
-            onPress: () => {
-              clearTokens();
+            onPress: async () => {
+              await disconnect();
+              await clearTokens();
               console.log('User logged out on mobile');
+              await ApiService.logoutApi()
               nav.navigate("Login");
               
             },

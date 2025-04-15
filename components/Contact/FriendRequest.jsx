@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState,useEffect } from 'react';
 import {
   View,
   Text,
@@ -10,95 +10,202 @@ import {
 } from 'react-native';
 import { ChevronLeft } from 'react-native-feather';
 import { LinearGradient } from 'expo-linear-gradient';
+import ApiService from '../../services/apis';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const FriendRequest = ({ navigation }) => {
   const [activeTab, setActiveTab] = useState('received');
+  const [receivedRequests, setReceivedRequests] = useState([]);
+  const [sentRequests, setSentRequests] = useState([]);
+  const [currentId, setCurrentId] = useState(null);
 
-  const receivedRequests = [
-    {
-      id: '1',
-      name: 'Trần Minh Phụng',
-      avatar: 'https://i.pravatar.cc/100?img=1',
-      status: 'Muốn kết bạn',
-    },
-    {
-      id: '2',
-      name: 'Sky',
-      avatar: 'https://i.pravatar.cc/100?img=2',
-      status: 'Muốn kết bạn',
-    },
-    {
-      id: '3',
-      name: 'Phước Tài',
-      avatar: null,
-      initials: 'PT',
-      status: 'Muốn kết bạn',
-      backgroundColor: '#e091ff',
-    },
-    // Add more received requests as needed
-  ];
+  //lay id user hien tai
+  useEffect(() =>{
+    const fetchData = async () =>{
+      try {
+        const currentUserId = await AsyncStorage.getItem('id');
+        setCurrentId(currentUserId);
+        console.log('currentUserId:', currentUserId);
+      } catch (error) {
+        console.error(error);
+        
+      }
+    };
+    fetchData();
+  }, []);
 
-  const sentRequests = [
-    {
-      id: '1',
-      name: 'Nguyễn Văn A',
-      avatar: 'https://i.pravatar.cc/100?img=3',
-      status: 'Đã gửi lời mời kết bạn',
-    },
-    {
-      id: '2',
-      name: 'Trần Thị B',
-      avatar: null,
-      initials: 'TB',
-      status: 'Đã gửi lời mời kết bạn',
-      backgroundColor: '#5c6bc0',
-    },
-    // Add more sent requests as needed
-  ];
+  //fetch các lời mời kết bạn đã nhận
+  useEffect(() => {
+    loadReceivedFriendRequests();
+  }, []);
+  
+  const loadReceivedFriendRequests = async () => {
+    try {
+      // 1. Gọi API lấy lời mời kết bạn
+      const response = await ApiService.getFriendRequest();
+      const friendRequests = response.data;
+  
+      // 2. Gọi API lấy toàn bộ user
+      const userResponse = await ApiService.getAllUser();
+      const allUsers = userResponse.data;
+  
+      // 3. Map lời mời với thông tin người gửi
+      const mappedRequests = friendRequests.map(req => {
+        const sender = allUsers.find(user => user.id === req.userId);
+        return {
+          id: sender.id,
+          name: sender.name,
+          avatar: sender.image || null,
+          status: 'Muốn kết bạn'
+        };
+      });
+  
+      setReceivedRequests(mappedRequests);
+    } catch (error) {
+      console.error('Lỗi khi lấy lời mời kết bạn:', error);
+    }
+  };
+  
+
+  //fetch các lời mời kết bạn đã gửi
+  useEffect(() => {
+    if (currentId) {
+      loadSentFriendRequests();
+    }
+  }, [currentId]);
+
+  const loadSentFriendRequests = async () => {
+    try {
+      // 1. Gọi API lấy tất cả các quan hệ bạn bè
+      const response = await ApiService.getFriendUserLogin(); // hoặc ApiService.getAllFriendships nếu có
+      const allFriendships = response.data;
+  
+      // 2. Gọi API lấy toàn bộ user
+      const userResponse = await ApiService.getAllUser();
+      const allUsers = userResponse.data;
+  
+      // 3. Lọc ra những lời mời mà user hiện tại là người gửi và đang chờ xác nhận
+      const sentPendingRequests = allFriendships.filter(
+        req => req.userId === currentId && req.status === 'PENDING'
+      );
+  
+      // 4. Map thông tin bạn bè từ danh sách người dùng
+      const mappedRequests = sentPendingRequests.map(req => {
+        const receiver = allUsers.find(user => user.id === req.friendId);
+        return {
+          id: receiver.id,
+          name: receiver.name,
+          avatar: receiver.image || null,
+          status: 'Đã gửi lời mời kết bạn',
+        };
+      });
+  
+      setSentRequests(mappedRequests);
+    } catch (error) {
+      console.error('Lỗi khi lấy lời mời đã gửi:', error);
+    }
+  };
+
+  // const sentRequests = [
+  //   {
+  //     id: '1',
+  //     name: 'Nguyễn Văn A',
+  //     avatar: 'https://i.pravatar.cc/100?img=3',
+  //     status: 'Đã gửi lời mời kết bạn',
+  //   },
+  //   {
+  //     id: '2',
+  //     name: 'Trần Thị B',
+  //     avatar: null,
+  //     initials: 'TB',
+  //     status: 'Đã gửi lời mời kết bạn',
+  //     backgroundColor: '#5c6bc0',
+  //   },
+  //   // Add more sent requests as needed
+  // ];
 
   const renderAvatar = (item) => {
     if (item.avatar) {
       return <Image source={{ uri: item.avatar }} style={styles.avatar} />;
     }
     return (
-      <View style={[styles.avatarPlaceholder, { backgroundColor: item.backgroundColor || '#ccc' }]}>
-        <Text style={styles.avatarInitials}>{item.initials}</Text>
+      <Image source={{ uri: 'https://i.pravatar.cc/100?img=3' }} style={styles.avatar} />
+    );
+  };
+
+  const renderReceivedItem = ({ item, index}) => {
+    const handleDecline = async () => {
+      try {
+        await ApiService.unFriend(item.id);
+        const updated = [...receivedRequests];
+        updated[index].status = 'Đã từ chối lời mời';
+        setReceivedRequests(updated);
+      } catch (error) {
+        console.error('Lỗi khi từ chối lời mời:', error);
+      }
+    };
+  
+    const handleAccept = async () => {
+      try {
+        await ApiService.acceptFriend(item.id);
+        const updated = [...receivedRequests];
+        updated[index].status = 'Đã chấp nhận lời mời';
+        setReceivedRequests(updated);
+      } catch (error) {
+        console.error('Lỗi khi chấp nhận lời mời:', error);
+      }
+    };
+  
+    return (
+      <View style={styles.requestItem}>
+        {renderAvatar(item)}
+        <View style={styles.requestInfo}>
+          <Text style={styles.name}>{item.name}</Text>
+          <Text style={styles.status}>{item.status}</Text>
+          {item.status === 'Muốn kết bạn' && (
+            <View style={styles.actionButtons}>
+              <TouchableOpacity style={styles.declineButton} onPress={handleDecline}>
+                <Text style={styles.declineButtonText}>Từ chối</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.acceptButton} onPress={handleAccept}>
+                <Text style={styles.acceptButtonText}>Đồng ý</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+        </View>
       </View>
     );
   };
 
-  const renderReceivedItem = ({ item }) => (
-    <View style={styles.requestItem}>
-      {renderAvatar(item)}
-      <View style={styles.requestInfo}>
-        <Text style={styles.name}>{item.name}</Text>
-        <Text style={styles.status}>{item.status}</Text>
-        <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.declineButton}>
-            <Text style={styles.declineButtonText}>Từ chối</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.acceptButton}>
-            <Text style={styles.acceptButtonText}>Đồng ý</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </View>
-  );
+  const renderSentItem = ({ item, index }) => {
+    const handleCancle = async () => {
+      try {
+        await ApiService.unFriend(item.id);
+        const updated = [...sentRequests];
+        updated[index].status = 'Đã hủy lời mời kết bạn';
+        setSentRequests(updated);
+      } catch (error) {
+        console.error('Lỗi khi hủy lời mời:', error);
+      }
+    };
 
-  const renderSentItem = ({ item }) => (
-    <View style={styles.requestItem}>
-      {renderAvatar(item)}
-      <View style={styles.requestInfo}>
-        <Text style={styles.name}>{item.name}</Text>
-        <Text style={styles.status}>{item.status}</Text>
-        <View style={styles.actionButtons}>
-          <TouchableOpacity style={styles.declineButton}>
-            <Text style={styles.declineButtonText}>Hủy</Text>
-          </TouchableOpacity>
+    return (
+      <View style={styles.requestItem}>
+        {renderAvatar(item)}
+        <View style={styles.requestInfo}>
+          <Text style={styles.name}>{item.name}</Text>
+          <Text style={styles.status}>{item.status}</Text>
+          {item.status === 'Đã gửi lời mời kết bạn' && (
+            <View style={styles.actionButtons}>
+              <TouchableOpacity style={styles.declineButton} onPress={handleCancle}>
+                <Text style={styles.declineButtonText}>Hủy</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </View>
-    </View>
-  );
+    )
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -129,14 +236,18 @@ const FriendRequest = ({ navigation }) => {
           onPress={() => setActiveTab('sent')}
         >
           <Text style={[styles.tabText, activeTab === 'sent' && styles.activeTabText]}>
-            Đã gửi
+            Đã gửi {sentRequests.length}
           </Text>
         </TouchableOpacity>
       </View>
 
       <FlatList
         data={activeTab === 'received' ? receivedRequests : sentRequests}
-        renderItem={activeTab === 'received' ? renderReceivedItem : renderSentItem}
+        renderItem={({ item, index }) =>
+          activeTab === 'received'
+            ? renderReceivedItem({ item, index })
+            : renderSentItem({ item, index })
+        }
         keyExtractor={item => item.id}
         style={styles.list}
       />

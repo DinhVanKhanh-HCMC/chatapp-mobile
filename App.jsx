@@ -7,9 +7,13 @@ import FriendRequest from "./components/Contact/FriendRequest";
 import ChatScreen from "./components/Message/ChatScreen";
 import CreateGroupScreen from "./components/Pages/CreateGroupScreen";
 import PersonalInfoScreen from "./components/Profile/PersonalInfoScreen";
+import { WebSocketProvider } from "./components/Message/WebSocketContext";
+import { ActionSheetProvider } from '@expo/react-native-action-sheet';
 
 export default function App() {
   return (
+    <ActionSheetProvider>
+    <WebSocketProvider>
     <NavigationContainer
       linking={{
         prefixes: ['myapp://'], // Tiền tố URL của ứng dụng
@@ -24,5 +28,7 @@ export default function App() {
       {/* <ChatScreen/> */}
       {/* <PersonalInfoScreen/> */}
     </NavigationContainer>
+    </WebSocketProvider>
+    </ActionSheetProvider>
   );
 }

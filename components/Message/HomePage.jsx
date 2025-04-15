@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import BottomMenuBar from '../Sidebar/BottomMenuBar';
 import ApiService from '../../services/apis';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import debounce from 'lodash/debounce';
 
 const HomePage = ({navigation}) => {
   const [activeTab, setActiveTab] = useState('messages');
@@ -27,12 +28,20 @@ const HomePage = ({navigation}) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [conversationNames, setConversationNames] = useState({});
+  const [conversationImages, setConversationImages] = useState({});
+  const [currentId, setCurrentId] = useState(null);
   
   // New states for phone search functionality
   const [showPhoneSearchModal, setShowPhoneSearchModal] = useState(false);
   const [phoneSearchResults, setPhoneSearchResults] = useState([]);
   const [phoneSearchLoading, setPhoneSearchLoading] = useState(false);
   const [activeSearchTab, setActiveSearchTab] = useState('all');
+  const [lastMessages, setLastMessages] = useState({});
+
+
+  //friend
+  const [friendStatusMap, setFriendStatusMap] = useState({});
+
 
   useEffect(() => {
     const fetchData = async () => {
@@ -40,18 +49,31 @@ const HomePage = ({navigation}) => {
         setLoading(true);
         const response = await ApiService.getAllConversations();
         if (response && response.data) {
-          setConversations(response.data);
+          
           
           // Lấy tên cho tất cả các cuộc trò chuyện
           const names = {};
+          const avts = {};
           const currentUserId = await AsyncStorage.getItem('id');
-          
+          setCurrentId(currentUserId);
+          const lastMessagesMap = {};
           // const allUsersResponse = await ApiService.getAllUser();
           // const allUsers = allUsersResponse.data; // Giả sử data chứa danh sách users
 
           for (const conversation of response.data) {
+
+            // const messages = conversation.messages || [];
+            // if (messages.length > 0) {
+            //   // Sắp xếp tin nhắn theo thời gian giảm dần
+            //   messages.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            //   conversation.lastMessage = messages[0].body; // Gán nội dung tin nhắn cuối
+            // } else {
+            //   conversation.lastMessage = null;
+            // }
+
             if (conversation.isGroup) {
               names[conversation.id] = conversation.name || 'Nhóm không tên';
+              avts[conversation.id] = conversation.image || 'https://i.pravatar.cc/100?img=3';
             } else {
               const otherMember = conversation.users?.find(
                 member => member.id !== currentUserId
@@ -61,13 +83,33 @@ const HomePage = ({navigation}) => {
                 // Tìm user trong danh sách allUsers đã lấy trước đó
                 //const user = allUsers.find(u => u.id === otherMember.userId);
                 names[conversation.id] = otherMember?.name || 'Người dùng';
+                avts[conversation.id] = otherMember?.image || 'https://i.pravatar.cc/100?img=1';
               } else {
                 names[conversation.id] = 'Người dùng';
+                avts[conversation.id] = 'https://i.pravatar.cc/100?img=1';
               }
             }
+
+            // Lấy tin nhắn cuối cùng
+            const messages = conversation.messages || [];
+            const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+
+            if (lastMessage) {
+              const isSenderMe = lastMessage.sender.id === currentUserId;
+              const prefix = isSenderMe ? 'Bạn: ' : '';
+              const messageText = lastMessage.deleted ? '[Tin nhắn đã thu hồi]' : lastMessage.body;
+              lastMessagesMap[conversation.id] = prefix + messageText;
+            } else {
+              lastMessagesMap[conversation.id] = 'Bắt đầu trò chuyện';
+            }
+
+
+            
           }
-          
+          setConversations(response.data);
           setConversationNames(names);
+          setConversationImages(avts);
+          setLastMessages(lastMessagesMap)
         }
       } catch (err) {
         setError(err.message || 'Không thể tải danh sách trò chuyện');
@@ -86,25 +128,32 @@ const HomePage = ({navigation}) => {
     return `${date.getDate()}/${date.getMonth() + 1}`;
   };
 
-  const getAvatar = (conversation) => {
-    return conversation.isGroup 
-      ? 'https://i.pravatar.cc/100?img=3' 
-      : 'https://i.pravatar.cc/100?img=1';
-  };
+  // const getAvatar = (conversation) => {
+  //   return conversation.isGroup 
+  //     ? 'https://i.pravatar.cc/100?img=3' 
+  //     : 'https://i.pravatar.cc/100?img=1';
+  //   if(conversation.isGroup){
+  //     return 'https://i.pravatar.cc/100?img=3'
+  //   }else{
+  //     const otherMember = conversation.users?.find(
+  //       member => member.id !== currentId
+  //     );
+  //   }
+  // };
 
   const renderChatItem = ({ item }) => (
     <TouchableOpacity 
       style={styles.chatItem}
       onPress={() => navigation.navigate('ChatScreen', { conversationId: item.id })}
     >
-      <Image source={{ uri: getAvatar(item) }} style={styles.avatar} />
+      <Image source={{ uri: conversationImages[item.id] }} style={styles.avatar} />
       <View style={styles.chatInfo}>
         <View style={styles.chatHeader}>
           <Text style={styles.chatName}>{conversationNames[item.id] || 'Đang tải...'}</Text>
           <Text style={styles.chatDate}>{formatDate(item.lastMessageAt)}</Text>
         </View>
         <Text style={styles.lastMessage} numberOfLines={1}>
-          {item.lastMessage || 'Bắt đầu trò chuyện'}
+          {lastMessages[item.id] || 'Bắt đầu trò chuyện'}
         </Text>
       </View>
     </TouchableOpacity>
@@ -120,6 +169,7 @@ const HomePage = ({navigation}) => {
   // Function to handle search submission
   const handleSearchSubmit = () => {
     if (isValidPhoneNumber(searchQuery.trim())) {
+      setPhoneSearchResults([]);
       searchUserByPhone(searchQuery.trim());
     }
   };
@@ -127,55 +177,77 @@ const HomePage = ({navigation}) => {
   // Mock function to search user by phone (replace with actual API call)
   const searchUserByPhone = async (phoneNumber) => {
     setPhoneSearchLoading(true);
-    
     try {
-      // In a real app, this would be an API call
-      // For demo purposes, we'll simulate an API response
-      setTimeout(() => {
-        // Mock data based on the image
-        if (phoneNumber === '0905321629') {
-          setPhoneSearchResults([{
-            id: '1',
-            name: 'Trần Thạnh',
-            phoneNumber: '090 5321629',
-            avatar: 'https://i.pravatar.cc/100?img=5'
-          }]);
-        } else {
-          // Random user for other phone numbers
-          setPhoneSearchResults([{
-            id: '2',
-            name: 'Người Dùng',
-            phoneNumber: phoneNumber.replace(/(\d{3})(\d{3})(\d{4})/, '$1 $2$3'),
-            avatar: 'https://i.pravatar.cc/100?img=2'
-          }]);
-        }
-        
-        setPhoneSearchLoading(false);
-        setShowPhoneSearchModal(true);
-      }, 500);
+      // Gọi API thực tế thay vì mock data
+      const response = await ApiService.getInfoByPhone(phoneNumber);
+      console.log(response.data.name)
+      if (response.data) {
+        const userData = response.data;
+        setPhoneSearchResults([{
+          id: userData.id,
+          name: userData.name,
+          phoneNumber: userData.phoneNumber || phoneNumber,
+          avatar: userData.image || 'https://i.pravatar.cc/100?img=5' // Fallback avatar nếu không có
+        }]);
+      } else {
+        // Nếu không có dữ liệu, hiển thị thông báo hoặc để mảng rỗng
+        setPhoneSearchResults([]);
+        // Hoặc có thể hiển thị thông báo không tìm thấy
+        Alert.alert('Thông báo', 'Không tìm thấy người dùng với số điện thoại này');
+      }
       
-      // In a real app, you would do something like:
-      // const response = await ApiService.searchUserByPhone(phoneNumber);
-      // setPhoneSearchResults(response.data);
+      setPhoneSearchLoading(false);
+      setShowPhoneSearchModal(true);
     } catch (err) {
       console.error('Error searching for user:', err);
       setPhoneSearchLoading(false);
+      setPhoneSearchResults([]);
+      Alert.alert('Lỗi', 'Đã có lỗi xảy ra khi tìm kiếm người dùng');
     }
   };
 
+  // hàm xử lý khi nhấn vào nút Kết bạn
+  const handleAddFriend = async (userId) => {
+    try {
+      const response = await ApiService.sendRequestFriend(userId);
+  
+      if (response.data.status === 'PENDING') {
+        setFriendStatusMap(prev => ({
+          ...prev,
+          [userId]: response.data.status,
+        }));
+      }
+    } catch (error) {
+      console.error('Lỗi gửi lời mời kết bạn:', error);
+    }
+  };
+  
+
   // Render user search result
-  const renderUserSearchResult = ({ item }) => (
-    <View style={styles.searchResultItem}>
-      <Image source={{ uri: item.avatar }} style={styles.searchResultAvatar} />
-      <View style={styles.searchResultInfo}>
-        <Text style={styles.searchResultName}>{item.name}</Text>
-        <Text style={styles.searchResultPhone}>Số điện thoại: {item.phoneNumber}</Text>
+  const renderUserSearchResult = ({ item }) => {
+    const status = friendStatusMap[item.id];
+    return(
+      <View style={styles.searchResultItem}>
+        <Image source={{ uri: item.avatar }} style={styles.searchResultAvatar} />
+        <View style={styles.searchResultInfo}>
+          <Text style={styles.searchResultName}>{item.name}</Text>
+
+          {status === 'PENDING' && (
+            <Text style={styles.requestSentText}>Đã gửi lời mời kết bạn</Text>
+          )}
+
+          {!status && (
+          <Text style={styles.searchResultPhone}>Số điện thoại: {item.phoneNumber}</Text>
+        )}
+        </View>
+        {String(item.id) !== String(currentId) && !status &&(
+        <TouchableOpacity style={styles.addFriendButton} onPress={() => handleAddFriend(item.id)}>
+          <Text style={styles.addFriendButtonText}>Kết bạn</Text>
+        </TouchableOpacity>
+        )}
       </View>
-      <TouchableOpacity style={styles.addFriendButton}>
-        <Text style={styles.addFriendButtonText}>Kết bạn</Text>
-      </TouchableOpacity>
-    </View>
-  );
+    )
+  };
 
   if (loading) {
     return (
@@ -193,7 +265,14 @@ const HomePage = ({navigation}) => {
     );
   }
 
+  const closeModal = () => {
+    setShowPhoneSearchModal(false);
+    setSearchQuery('');
+    setPhoneSearchResults([]); // 👈 clear kết quả
+  };
+
   return (
+    //render giao dien man hinh tin nhan
     <SafeAreaView style={styles.container}>
       <LinearGradient
         colors={['#0088ff', '#0055ff']}
@@ -225,6 +304,9 @@ const HomePage = ({navigation}) => {
 
       <BottomMenuBar navigation={navigation} activeTab={activeTab} />
       
+
+
+      
       <Modal
         visible={showModal}
         transparent={true}
@@ -253,6 +335,7 @@ const HomePage = ({navigation}) => {
         </TouchableOpacity>
       </Modal>
 
+      
       {/* Phone Search Modal */}
       <Modal
         visible={showPhoneSearchModal}
@@ -263,7 +346,7 @@ const HomePage = ({navigation}) => {
           <View style={styles.phoneSearchHeader}>
             <TouchableOpacity 
               style={styles.phoneSearchBackButton}
-              onPress={() => setShowPhoneSearchModal(false)}
+              onPress={closeModal}
             >
               <ArrowLeft stroke="#000" width={24} height={24} />
             </TouchableOpacity>

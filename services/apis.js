@@ -6,7 +6,7 @@ import Toast from 'react-native-toast-message';
 import { message } from 'antd-mobile';
 import axiosInstance from './axiosconfig';
 import { Platform,Alert } from 'react-native';
-const BASE_URL = 'http://192.168.1.2:8080/api';
+const BASE_URL = 'http://192.168.1.5:8080/api';
 
 
 
@@ -29,8 +29,9 @@ export default class ApiService {
     }
   }
 
-  //AUTH login
-
+  //AUTH --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  
+  //login
   static async loginApi(loginDetails) {
     try {
       console.log("Dữ liệu gửi đi:", JSON.stringify(loginDetails));
@@ -46,6 +47,20 @@ export default class ApiService {
     }
   }
 
+  //logout
+  static async logoutApi() {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.get(`${BASE_URL}/auth/loggout`, {
+        headers: headers, 
+      });
+  
+      return response.data; // Trả về danh sách các conversation
+    } catch (error) {
+      Alert.alert('Lỗi','Lỗi khi gọi api logout!')
+      throw error;
+    }
+  }
 
   // register
   static async register(formDataToSend) {
@@ -67,7 +82,7 @@ export default class ApiService {
   }
   };
 
-
+  //reset password
   static async resetPassword(resetPasswordDetails) {
     try {
       const response = await axios.post(
@@ -81,6 +96,7 @@ export default class ApiService {
     }
   }
 
+  //send OTP
   static async sendOTP(email, mode) {
     try {
       console.log("Dữ liệu gửi đi:", email);
@@ -113,7 +129,14 @@ export default class ApiService {
       throw error; // để `handleSendOTP` biết là lỗi
     }
   }
-  
+
+
+
+
+  //-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+
+  //CONVER --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
   //get conversation
   static async getAllConversations() {
@@ -130,6 +153,54 @@ export default class ApiService {
     }
   }
 
+  //lay chi tiet conver bang converID của người dùng hiện tại
+  static async getConversationById(converId) {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.post(`${BASE_URL}/conversation/${converId}`,{}, {
+        headers: headers,
+      });
+      return response.data;
+    } catch (error) {
+      message.error('Lỗi khi lấy thông tin tất cả friendship của user:', error);
+    }
+  }
+
+
+
+
+  //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+  
+
+  //USER --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+  //get all user
+  static async getAllUser() {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.get(`${BASE_URL}/users/get-all`, {
+        headers: headers,
+      });
+      return response.data;
+    } catch (error) {
+      message.error('Lỗi khi lấy thông tin all user:', error);
+    }
+  }
+
+
+  //get infor user
+  static async getUserInfo() {
+    try {
+      const headers = await this.getHeader();
+      const response = await axiosInstance.get(`${BASE_URL}/users/get-phone`);
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching user info:', error);
+      throw error;
+    }
+  }
+  
   //update info
   static async updateInfo(id,formData) {
     try {
@@ -146,35 +217,7 @@ export default class ApiService {
     }
   }
 
-  //get infor user
-  static async getUserInfo() {
-    try {
-      const headers = await this.getHeader();
-      const response = await axiosInstance.get(`${BASE_URL}/users/get-phone`);
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching user info:', error);
-      throw error;
-    }
-  }
-
-  
-
-
-  // USER
-
-  static async getAllUser() {
-    try {
-      const headers = await this.getHeader();
-      const response = await axios.get(`${BASE_URL}/users/get-all`, {
-        headers: headers,
-      });
-      return response.data;
-    } catch (error) {
-      message.error('Lỗi khi lấy thông tin all user:', error);
-    }
-  }
-
+  //get info current user login
   static async getPhoneLogin() {
     try {
       const headers = await this.getHeader();
@@ -187,42 +230,215 @@ export default class ApiService {
     }
   }
 
-  // // CONVERSSTION
+  //get user infor by phone to add friend 
+  static async getInfoByPhone(phoneNumber) {
+    try {
+      const response = await axios.get(
+        `${BASE_URL}/users/getPhoneFriend`,{
+          params:{
+            phoneNumber: phoneNumber
+          }
+        }
+      );
+      console.log("Phản hồi API:", response.data);
+      return response.data;
+    } catch (error) {
+      console.error("Lỗi từ API:", error.response?.data || error.message);
+      throw error.response?.data?.message || 'Lỗi lấy thông tin';
+    }
+  }
+  
+  //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
-  // static async getConversation() {
-  //   try {
-  //     const response = await axios.get(`${this.BASE_URL}/conversation`, {
-  //       headers: this.getHeader()
-  //     });
-  //     return response.data;
-  //   } catch (error) {
-  //     message.error('Lỗi khi lấy thông tin conversation:', error);
-  //   }
-  // }
-  // static async getConversationId(conversationId) {
-  //   try {
-  //     const response = await axios.post(
-  //       `${this.BASE_URL}/conversation/${conversationId}`
-  //     );
-  //     return response.data;
-  //   } catch (error) {
-  //     message.error(error.response?.data);
-  //     throw error;
-  //   }
-  // }
 
-  // // MESSAGE
-  // static async getMessages(conversationId) {
-  //   try {
-  //     const response = await axios.post(
-  //       `${this.BASE_URL}/messages/${conversationId}`
-  //     );
-  //     return response.data;
-  //   } catch (error) {
-  //     message.error(error.response?.data);
-  //     throw error;
-  //   }
-  // }
+  //FRIEND --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+  // send Request Friend
+  static async sendRequestFriend(friendId) {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.post(
+        `${BASE_URL}/friend/sendFriend`,{},
+        {
+          headers: headers,
+          params: { friendId: friendId }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      // ✅ Kiểm tra an toàn
+      if (error.response) {
+        console.error('Lỗi từ server:', error.response.data);
+      } else if (error.request) {
+        console.error('Không nhận được phản hồi từ server:', error.request);
+      } else {
+        console.error('Lỗi khi gửi request:', error.message);
+      }
+      throw error; // Nên throw để xử lý ở nơi gọi hàm
+    }
+  }
+
+  //get friendShip user login
+  static async getFriendUserLogin() {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.get(`${BASE_URL}/friend/getFriendUserLogin`, {
+        headers: headers,
+      });
+      return response.data;
+    } catch (error) {
+      message.error('Lỗi khi lấy thông tin tất cả friendship của user:', error);
+    }
+  }
+
+  //get friend request
+  static async getFriendRequest() {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.get(`${BASE_URL}/friend/received-requests`, {
+        headers: headers,
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Lỗi khi lấy thông tin lời mời kết bạn:', error);
+    }
+  }
+
+  //accept friend
+  static async acceptFriend(friendId) {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.post(`${BASE_URL}/friend/acceptFriend`,{}, {
+        headers: headers, params:{ friendId: friendId}
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Lỗi khi gọi api chấp nhận kết bạn:', error);
+    }
+  }
+
+  //unfriend
+  static async unFriend(friendId) {
+    try {
+      if (!friendId) {
+        throw new Error('friendId không được xác định!');
+      }
+  
+      const headers = await this.getHeader();
+      const response = await axios.post(
+        `${BASE_URL}/friend/unfriend`,
+        null,
+        {
+          headers,
+          params: { friendId }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error('Lỗi khi gọi api unfriend:', error);
+      throw error;
+    }
+  }
+  
+
+  //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+  
+
+
+  //MESSAGE---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+  //get all message
+  static async getAllMessage(conversationId) {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.get(`${BASE_URL}/messages/${conversationId}`, {
+        headers: headers
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Lỗi khi gọi api lấy tất cả tin nhắn của conver:', error);
+    }
+  }
+
+  //upload file
+  static async uploadFile(fileUri) {
+    try {
+      const headers = await this.getHeader();
+  
+      const formData = new FormData();
+      formData.append('photo', {
+        uri: fileUri,
+        name: 'upload.jpg',
+        type: 'image/jpeg',
+      });
+  
+      const response = await axios.post(`${BASE_URL}/messages/upload`, formData, {
+        headers: {
+          ...headers,
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+  
+      return response.data; // hoặc response.data nếu bạn để khác
+    } catch (error) {
+      console.error('Lỗi khi upload file:', error);
+      throw error;
+    }
+  }
+
+  //delete message
+  static async deleteMessage(messageId) {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.delete(`${BASE_URL}/messages/${messageId}/xoa`, {
+        headers: headers
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Lỗi khi gọi api xóa tin nhắn:', error);
+    }
+  }
+
+  //unsend message
+  static async unsendMessage(messageId,conversationId) {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.delete(`${BASE_URL}/messages/${messageId}/thu-hoi`, {
+        headers: headers, params: {conversationId: conversationId}
+      });
+      return response.data;
+    } catch (error) {
+      if (error.response && error.response.status === 400) {
+        Alert.alert('Lỗi', 'Quá thời gian thu hồi (6 phút)');
+      } else {
+        console.error('Lỗi khi gọi API thu hồi tin nhắn:', error);
+      }
+      
+    }
+  }
+
+  //share message
+  static async shareMessage(formData) {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.post(`${BASE_URL}/messages/shareMessage`,formData, {
+        headers: headers
+      });
+      return response.data;
+    } catch (error) {
+      if (error.response && error.response.status === 400) {
+        Alert.alert('Lỗi', 'Tin nhăn này đã bị thu hồi');
+      } else {
+        console.error('Lỗi khi gọi API chuyển tiếp tin nhắn:', error);
+      }
+    }
+      
+  }
+  
+
+
+
+  //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
   static isAuthenticated() {
     const token = localStorage.getItem('token');
