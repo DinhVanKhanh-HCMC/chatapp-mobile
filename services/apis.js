@@ -571,6 +571,21 @@ export default class ApiService {
       console.error('Lỗi khi gọi api seen message:', error);
     }
   }
+
+  //xóa lịch sử trò chuyện
+  //share message
+  static async deleteHistoryChat(conversationId) {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.post(`${BASE_URL}/messages/deleteHistoryMessageUser/${conversationId}`,{}, {
+        headers: headers
+      });
+      return response.data;
+    } catch (error) {
+        console.error('Lỗi khi gọi API xóa lịch sử chat:', error);
+    }
+      
+  }
   
 
 

@@ -445,6 +445,45 @@ const handleCloseAddMember = (needRefresh) => {
     }
   };
 
+  //hàm xử lý xóa lịch sử trò chuyện
+  const handleDeleteHistoryChat = async () => {
+    Alert.alert(
+      'Rời nhóm',
+      'Bạn có chắc chắn muốn xóa lịch sử trò chuyện?',
+      [
+        {
+          text: 'Hủy',
+          style: 'cancel',
+        },
+        {
+          text: 'Có',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const response = await ApiService.deleteHistoryChat(conversationId);
+              
+              if (response?.message?.includes("Xóa tin nhắn thành công")) {
+
+
+                Alert.alert("Thành công", "Xóa lịch sử tin nhắn thành công", [
+                  {
+                    text: "OK",
+                    onPress: () => navigation.goBack() // Chuyển trang sau khi xác nhận
+                  }
+                ]);
+
+              } else {
+                Alert.alert("Lỗi", "Không thể xóa lịch sử chat");
+              }
+            } catch (err) {
+              console.error("Lỗi xóa lịch sử chat nhóm:", err);
+              Alert.alert("Lỗi", err.response?.data?.message || "Có lỗi xảy ra khi gọi API.");
+            }
+          },
+        },
+      ],
+    );
+  }
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
@@ -490,7 +529,7 @@ const handleCloseAddMember = (needRefresh) => {
           <Text style={styles.menuText}>Xem thành viên</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem}>
+        <TouchableOpacity style={styles.menuItem} onPress={handleDeleteHistoryChat}>
           <Text style={styles.menuText}>Xóa lịch sử trò chuyện</Text>
         </TouchableOpacity>
 

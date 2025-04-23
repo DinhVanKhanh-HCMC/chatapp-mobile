@@ -434,6 +434,61 @@ const ChatScreen = ({ navigation, route }) => {
       );
     };
 
+
+
+    //nếu tin nhắn là file
+    if (item.type === 'file' && item.fileInfo) {
+      return (
+        <TouchableOpacity onLongPress={handleLongPress}>
+          <View style={[
+            styles.messageContainer,
+            item.sent ? styles.sentMessage : styles.receivedMessage
+          ]}>
+            {!item.sent && item.user?.avatar && (
+              <Image source={{ uri: item.user.avatar }} style={styles.avatar} />
+            )}
+            <View style={[
+              styles.fileBubble,
+              item.sent ? styles.sentBubble : styles.receivedBubble
+            ]}>
+              {showSenderName && (
+                <Text style={styles.senderName}>{item.user?.name}</Text>
+              )}
+              {item.deleted ? (
+                <View style={styles.recalledFileContainer}>
+                  <Text style={styles.recalledText}>File đã được thu hồi</Text>
+                </View>
+              ) : (
+                <TouchableOpacity 
+                  style={styles.fileContainer}
+                  onPress={() => handleOpenFile(item.fileInfo)}
+                >
+                  <Icon name="file" size={24} color="#555" />
+                  <View style={styles.fileInfo}>
+                    <Text style={styles.fileName} numberOfLines={1}>
+                      {item.fileInfo.name}
+                    </Text>
+                    <Text style={styles.fileSize}>
+                      {formatFileSize(item.fileInfo.size)}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              )}
+              <Text style={styles.timeText}>{item.time}</Text>
+            </View>
+            {item.reactions && (
+              <View style={styles.reactionContainer}>
+                <Heart fill="#ff0000" stroke="#ff0000" width={16} height={16} />
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
+
+
+    //nếu tin nhắn là image
     const showSenderName = isGroup && !item.sent;
 
 
@@ -686,6 +741,37 @@ const ChatScreen = ({ navigation, route }) => {
     }
   };
 
+  //hàm xử lý mở file
+  const handleOpenFile = async (fileInfo) => {
+    try {
+      // Kiểm tra quyền truy cập file trước
+      const fileUri = fileInfo.uri;
+      const fileExists = await FileSystem.getInfoAsync(fileUri);
+      
+      if (!fileExists.exists) {
+        throw new Error('File không tồn tại');
+      }
+  
+      // Mở file với ứng dụng phù hợp
+      await Sharing.shareAsync(fileUri, {
+        mimeType: mime.lookup(fileInfo.name) || 'application/pdf',
+        dialogTitle: `Mở ${fileInfo.name}`,
+      });
+    } catch (error) {
+      console.error('Lỗi mở file:', error);
+      Alert.alert('Lỗi', 'Không thể mở file này');
+    }
+  };
+  
+  // Hàm định dạng kích thước file
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return (bytes / Math.pow(k, i)).toFixed(2) + ' ' + sizes[i];
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
@@ -722,9 +808,10 @@ const ChatScreen = ({ navigation, route }) => {
             <TouchableOpacity style={styles.headerButton}>
               <Video stroke="#fff" width={24} height={24} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.headerButton} onPress={() => nav.navigate('Options', {conversationId: conversationId})}>
+            {conversationInfo?.isGroup && (<TouchableOpacity style={styles.headerButton} onPress={() => nav.navigate('Options', {conversationId: conversationId})}>
               <Menu stroke="#fff" width={24} height={24} />
             </TouchableOpacity>
+            )}
           </View>
         </View>
       </LinearGradient>
@@ -1152,6 +1239,37 @@ const styles = StyleSheet.create({
   },
   checkboxContainer: {
     marginRight: 12,
+  },
+  fileBubble: {
+    maxWidth: '80%',
+    padding: 8,
+  },
+  fileContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 10,
+    backgroundColor: '#f0f0f0',
+    borderRadius: 8,
+    marginTop: 5,
+  },
+  fileInfo: {
+    marginLeft: 10,
+    flex: 1,
+  },
+  fileName: {
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  fileSize: {
+    fontSize: 12,
+    color: '#666',
+    marginTop: 2,
+  },
+  recalledFileContainer: {
+    padding: 10,
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    alignItems: 'center',
   },
 });
 
