@@ -166,7 +166,107 @@ export default class ApiService {
     }
   }
 
+  //tao nhom
+  static async createConversation(data) {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.post(`${BASE_URL}/conversation/create/conversation`,data, {
+        headers: headers,
+      });
+      return response.data;
+    } catch (error) {
+      message.error('Lỗi khi tạo conversation:', error);
+    }
+  }
 
+  //get user trong group
+  static async getUsersConversation(conversationId) {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.get(`${BASE_URL}/conversation/getUser/${conversationId}`, {
+        headers: headers, 
+      });
+  
+      return response.data; // Trả về danh sách các conversation
+    } catch (error) {
+      Alert.alert('Lỗi','Không thể lấy danh sách cuộc trò chuyện!')
+      throw error;
+    }
+  }
+
+  //thêm user vảo group
+  static async addUserToGroup(conversationId,data) {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.post(`${BASE_URL}/conversation/addUserConversation/${conversationId}`,data, {
+        headers: headers,
+      });
+      return response.data;
+    } catch (error) {
+      message.error('Lỗi khi thêm user vào group:', error);
+    }
+  }
+
+  // roi khoi nhom
+  static async exitGroup(conversationId,id) {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.put(`${BASE_URL}/conversation/exit/${conversationId}`,{},
+        {
+          headers: headers,
+          params: { newAdminId: id }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      message.error('Lỗi khi rời khỏi nhóm:', error);
+    }
+  }
+
+  //chuyển quyền nhóm trưởng
+  static async ChangeLeader(conversationId,id) {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.put(`${BASE_URL}/conversation/changeLeader/${conversationId}`,{},
+        {
+          headers: headers,
+          params: { newAdminId: id }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      message.error('Lỗi khi rời khỏi nhóm:', error);
+    }
+  }
+
+  //giải tán nhóm
+  static async DeleteConversation(conversationId) {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.post(`${BASE_URL}/conversation/delete/${conversationId}`,{}, {
+        headers: headers,
+      });
+      return response.data;
+    } catch (error) {
+      message.error('Lỗi khi thêm user vào group:', error);
+    }
+  }
+
+  //xóa thành viên nhóm bởi admin
+  static async removeMember(conversationId, id) {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.delete(`${BASE_URL}/conversation/removeMember/${conversationId}`, 
+        {
+          headers: headers,
+          params: { memberId: id }
+        }
+      );
+      return response.data;
+    } catch (error) {
+      message.error('Lỗi khi gọi api xóa thành viên:', error);
+    }
+  }
 
 
   //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
@@ -247,6 +347,17 @@ export default class ApiService {
       throw error.response?.data?.message || 'Lỗi lấy thông tin';
     }
   }
+
+  //get online user
+  static async getOnlineUsers() {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.get(`${BASE_URL}/users/onlineUser`);
+      return response.data;
+    } catch (error) {
+      console.error('Lỗi khi lấy thông tin user online:', error);
+    }
+  }
   
   //---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -282,12 +393,12 @@ export default class ApiService {
   static async getFriendUserLogin() {
     try {
       const headers = await this.getHeader();
-      const response = await axios.get(`${BASE_URL}/friend/getFriendUserLogin`, {
+      const response = await axios.get(`${BASE_URL}/friend/getFriendUserAccept`, {
         headers: headers,
       });
       return response.data;
     } catch (error) {
-      message.error('Lỗi khi lấy thông tin tất cả friendship của user:', error);
+      message.error('Lỗi khi lấy thông tin tất cả bạn bè của user:', error);
     }
   }
 
@@ -314,6 +425,19 @@ export default class ApiService {
       return response.data;
     } catch (error) {
       console.error('Lỗi khi gọi api chấp nhận kết bạn:', error);
+    }
+  }
+
+  //get friendShip user login
+  static async getPendingFriendRequestSentByUser() {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.get(`${BASE_URL}/friend/getPendingFriendRequestsSentByUser`, {
+        headers: headers,
+      });
+      return response.data;
+    } catch (error) {
+      message.error('Lỗi khi lấy thông tin tất cả các lời mời của user đã gửi đi:', error);
     }
   }
 
@@ -361,16 +485,16 @@ export default class ApiService {
   }
 
   //upload file
-  static async uploadFile(fileUri) {
+  static async uploadFile(formData) {
     try {
       const headers = await this.getHeader();
   
-      const formData = new FormData();
-      formData.append('photo', {
-        uri: fileUri,
-        name: 'upload.jpg',
-        type: 'image/jpeg',
-      });
+      // const formData = new FormData();
+      // formData.append('photo', {
+      //   uri: fileUri,
+      //   name: 'upload.jpg',
+      //   type: 'image/jpeg',
+      // });
   
       const response = await axios.post(`${BASE_URL}/messages/upload`, formData, {
         headers: {
@@ -433,6 +557,19 @@ export default class ApiService {
       }
     }
       
+  }
+
+  //seen message
+  static async seenMessage(conversationId) {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.post(`${BASE_URL}/messages/${conversationId}/seen`,{},{
+        headers: headers
+      });
+      return response.data;
+    } catch (error) {
+      console.error('Lỗi khi gọi api seen message:', error);
+    }
   }
   
 

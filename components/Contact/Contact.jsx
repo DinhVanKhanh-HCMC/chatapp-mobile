@@ -73,26 +73,51 @@ const Contact = ({ navigation }) => {
     fetchData();
   }, []);
   //hàm xử lý lấy danh sách bạn bè của người dùng hiện tại
-  useEffect(() => {
+  // useEffect(() => {
+  //   if (!currentId) return;
     
+  //   const fetchContacts = async () => {
+  //     try {
+  //       const response = await ApiService.getFriendUserLogin();
+  //       const accepted = response.data.filter(f => f.status === 'ACCEPTED');
+  
+        
+  //       const contactList = [];
+  
+  //       for (const friend of accepted) {
+  //         const convRes = await ApiService.getConversationById(friend.conversationId);
+  //         const users = convRes.data.users;
+  
+  //         // Lấy người không phải mình
+  //         const contact = users.find(u => u.id !== currentId);
+  //         if (contact) {
+  //           contactList.push(contact);
+  //         }
+  //       }
+  
+  //       setContacts(contactList); // Gán danh sách user đầy đủ cho component
+  //     } catch (error) {
+  //       console.error('Lỗi khi load danh sách bạn bè:', error);
+  //     }
+  //   };
+  
+  //   fetchContacts();
+  // }, [currentId]);
+
+  useEffect(() => {
+    if (!currentId) return;
+  
     const fetchContacts = async () => {
       try {
         const response = await ApiService.getFriendUserLogin();
-        const accepted = response.data.filter(f => f.status === 'ACCEPTED');
+        const acceptedFriends = response.data; // API giờ chỉ trả về các friend đã accepted
   
-        
-        const contactList = [];
-  
-        for (const friend of accepted) {
-          const convRes = await ApiService.getConversationById(friend.conversationId);
-          const users = convRes.data.users;
-  
-          // Lấy người không phải mình
-          const contact = users.find(u => u.id !== currentId);
-          if (contact) {
-            contactList.push(contact);
-          }
-        }
+        const contactList = acceptedFriends.map(friend => ({
+          id: friend.friendId,
+          name: friend.friendName,
+          image: friend.image,
+          conversationId: friend.conversationId,
+        }));
   
         setContacts(contactList); // Gán danh sách user đầy đủ cho component
       } catch (error) {
@@ -101,7 +126,7 @@ const Contact = ({ navigation }) => {
     };
   
     fetchContacts();
-  }, []);
+  }, [currentId]);
   
 
   const renderContactItem = ({ item }) => (

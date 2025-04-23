@@ -74,37 +74,56 @@ const FriendRequest = ({ navigation }) => {
     }
   }, [currentId]);
 
+  // const loadSentFriendRequests = async () => {
+  //   try {
+  //     // 1. Gọi API lấy tất cả các quan hệ bạn bè
+  //     const response = await ApiService.getFriendUserLogin(); // hoặc ApiService.getAllFriendships nếu có
+  //     const allFriendships = response.data;
+  
+  //     // 2. Gọi API lấy toàn bộ user
+  //     const userResponse = await ApiService.getAllUser();
+  //     const allUsers = userResponse.data;
+  
+  //     // 3. Lọc ra những lời mời mà user hiện tại là người gửi và đang chờ xác nhận
+  //     const sentPendingRequests = allFriendships.filter(
+  //       req => req.userId === currentId && req.status === 'PENDING'
+  //     );
+  
+  //     // 4. Map thông tin bạn bè từ danh sách người dùng
+  //     const mappedRequests = sentPendingRequests.map(req => {
+  //       const receiver = allUsers.find(user => user.id === req.friendId);
+  //       return {
+  //         id: receiver.id,
+  //         name: receiver.name,
+  //         avatar: receiver.image || null,
+  //         status: 'Đã gửi lời mời kết bạn',
+  //       };
+  //     });
+  
+  //     setSentRequests(mappedRequests);
+  //   } catch (error) {
+  //     console.error('Lỗi khi lấy lời mời đã gửi:', error);
+  //   }
+  // };
+
   const loadSentFriendRequests = async () => {
     try {
-      // 1. Gọi API lấy tất cả các quan hệ bạn bè
-      const response = await ApiService.getFriendUserLogin(); // hoặc ApiService.getAllFriendships nếu có
-      const allFriendships = response.data;
+      const response = await ApiService.getPendingFriendRequestSentByUser();
+      const pendingSent = response.data;
   
-      // 2. Gọi API lấy toàn bộ user
-      const userResponse = await ApiService.getAllUser();
-      const allUsers = userResponse.data;
-  
-      // 3. Lọc ra những lời mời mà user hiện tại là người gửi và đang chờ xác nhận
-      const sentPendingRequests = allFriendships.filter(
-        req => req.userId === currentId && req.status === 'PENDING'
-      );
-  
-      // 4. Map thông tin bạn bè từ danh sách người dùng
-      const mappedRequests = sentPendingRequests.map(req => {
-        const receiver = allUsers.find(user => user.id === req.friendId);
-        return {
-          id: receiver.id,
-          name: receiver.name,
-          avatar: receiver.image || null,
-          status: 'Đã gửi lời mời kết bạn',
-        };
-      });
+      const mappedRequests = pendingSent.map(friend => ({
+        id: friend.friendId,
+        name: friend.friendName,
+        avatar: friend.image || null,
+        status: 'Đã gửi lời mời kết bạn',
+      }));
   
       setSentRequests(mappedRequests);
     } catch (error) {
       console.error('Lỗi khi lấy lời mời đã gửi:', error);
     }
   };
+  
 
   // const sentRequests = [
   //   {

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import {
   View,
   Text,
@@ -19,6 +20,7 @@ import BottomMenuBar from '../Sidebar/BottomMenuBar';
 import ApiService from '../../services/apis';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import debounce from 'lodash/debounce';
+import { useNavigation } from '@react-navigation/native';
 
 const HomePage = ({navigation}) => {
   const [activeTab, setActiveTab] = useState('messages');
@@ -30,6 +32,7 @@ const HomePage = ({navigation}) => {
   const [conversationNames, setConversationNames] = useState({});
   const [conversationImages, setConversationImages] = useState({});
   const [currentId, setCurrentId] = useState(null);
+  const nav = useNavigation()
   
   // New states for phone search functionality
   const [showPhoneSearchModal, setShowPhoneSearchModal] = useState(false);
@@ -37,13 +40,41 @@ const HomePage = ({navigation}) => {
   const [phoneSearchLoading, setPhoneSearchLoading] = useState(false);
   const [activeSearchTab, setActiveSearchTab] = useState('all');
   const [lastMessages, setLastMessages] = useState({});
-
-
   //friend
   const [friendStatusMap, setFriendStatusMap] = useState({});
+  //online user:
+  const [onlineUsers, setOnlineUsers] = useState([]);
+  //seen message
+  const [unseenMessages, setUnseenMessages] = useState([]);
 
 
+  //get user online
   useEffect(() => {
+    const fetchOnlineUsers = async () => {
+      try {
+        const response = await ApiService.getOnlineUsers(); // không cần truyền gì
+        if (response.code === 200 && Array.isArray(response.data)) {
+          setOnlineUsers(response.data); // Lấy mảng user từ response.data
+        } else {
+          console.error('Dữ liệu không hợp lệ:', response);
+          setOnlineUsers([]); // Đặt mảng rỗng nếu dữ liệu không hợp lệ
+        }
+      } catch (error) {
+        console.error('Lỗi khi lấy danh sách online:',response.message );
+      }
+    };
+  
+    fetchOnlineUsers();
+  }, []);
+
+  const getRandomColor = () => {
+    const colors = ['#FF6633', '#FFB399', '#FF33FF', '#FFFF99', '#00B3E6'];
+    return colors[Math.floor(Math.random() * colors.length)];
+  };
+
+  useFocusEffect(
+  //useEffect(() => {
+  useCallback(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
@@ -57,23 +88,23 @@ const HomePage = ({navigation}) => {
           const currentUserId = await AsyncStorage.getItem('id');
           setCurrentId(currentUserId);
           const lastMessagesMap = {};
+          const unseenMessages = {};
           // const allUsersResponse = await ApiService.getAllUser();
           // const allUsers = allUsersResponse.data; // Giả sử data chứa danh sách users
 
           for (const conversation of response.data) {
 
-            // const messages = conversation.messages || [];
-            // if (messages.length > 0) {
-            //   // Sắp xếp tin nhắn theo thời gian giảm dần
-            //   messages.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-            //   conversation.lastMessage = messages[0].body; // Gán nội dung tin nhắn cuối
-            // } else {
-            //   conversation.lastMessage = null;
-            // }
-
             if (conversation.isGroup) {
               names[conversation.id] = conversation.name || 'Nhóm không tên';
-              avts[conversation.id] = conversation.image || 'https://i.pravatar.cc/100?img=3';
+              //avts[conversation.id] = conversation.image || 'https://i.pravatar.cc/100?img=3';
+              // avts[conversation.id] = conversation.image || 
+              //   `initial:${conversation.name ? conversation.name.charAt(0).toUpperCase() : '?'}`;
+
+              avts[conversation.id] = {
+                type: conversation.image ? 'image' : 'initial',
+                value: conversation.image || (conversation.name ? conversation.name.charAt(0).toUpperCase() : '?'),
+                backgroundColor: getRandomColor() // Hàm tạo màu ngẫu nhiên
+              };
             } else {
               const otherMember = conversation.users?.find(
                 member => member.id !== currentUserId
@@ -99,17 +130,31 @@ const HomePage = ({navigation}) => {
               const prefix = isSenderMe ? 'Bạn: ' : '';
               const messageText = lastMessage.deleted ? '[Tin nhắn đã thu hồi]' : lastMessage.body;
               lastMessagesMap[conversation.id] = prefix + messageText;
+
+              // Kiểm tra tin nhắn chưa đọc
+              unseenMessages[conversation.id] = !isSenderMe && 
+              (!lastMessage.seen || 
+              !lastMessage.seen.some(seenUser => seenUser.id === currentUserId));
+
             } else {
               lastMessagesMap[conversation.id] = 'Bắt đầu trò chuyện';
+              unseenMessages[conversation.id] = false;
             }
 
 
             
           }
-          setConversations(response.data);
+          const sortedConversations = [...response.data].sort((a, b) => {
+            const dateA = new Date(a.lastMessageAt || a.createdAt);
+            const dateB = new Date(b.lastMessageAt || b.createdAt);
+            return dateB - dateA; // Sắp xếp giảm dần (mới nhất lên đầu)
+          });
+
+          setConversations(sortedConversations);
           setConversationNames(names);
           setConversationImages(avts);
           setLastMessages(lastMessagesMap)
+          setUnseenMessages(unseenMessages);
         }
       } catch (err) {
         setError(err.message || 'Không thể tải danh sách trò chuyện');
@@ -120,7 +165,33 @@ const HomePage = ({navigation}) => {
     };
 
     fetchData();
-  }, []);
+  }, [])
+  );
+
+  // Thêm useEffect để cập nhật khi focus lại màn hình
+  useFocusEffect(
+    useCallback(() => {
+      const updateSeenStatus = async () => {
+        const updatedUnseenMessages = {...unseenMessages};
+        
+        for (const conversation of conversations) {
+          const messages = conversation.messages || [];
+          const lastMessage = messages[messages.length - 1];
+          
+          if (lastMessage && lastMessage.sender.id !== currentId) {
+            updatedUnseenMessages[conversation.id] = 
+              !lastMessage.seen || 
+              !lastMessage.seen.some(seenUser => seenUser.id === currentId);
+          }
+        }
+        
+        setUnseenMessages(updatedUnseenMessages);
+      };
+      
+      updateSeenStatus();
+    }, [conversations])
+  );
+  
 
   const formatDate = (dateString) => {
     if (!dateString) return '';
@@ -128,36 +199,58 @@ const HomePage = ({navigation}) => {
     return `${date.getDate()}/${date.getMonth() + 1}`;
   };
 
-  // const getAvatar = (conversation) => {
-  //   return conversation.isGroup 
-  //     ? 'https://i.pravatar.cc/100?img=3' 
-  //     : 'https://i.pravatar.cc/100?img=1';
-  //   if(conversation.isGroup){
-  //     return 'https://i.pravatar.cc/100?img=3'
-  //   }else{
-  //     const otherMember = conversation.users?.find(
-  //       member => member.id !== currentId
-  //     );
-  //   }
-  // };
+  const renderChatItem = ({ item }) => {
+     // Lấy danh sách user IDs trong cuộc trò chuyện (trừ ID của chính mình)
+    const otherUserIds = item.users
+    .filter(user => user && user.id !== currentId) // currentUserId là ID của bạn
+    .map(user => user.id);
+    
 
-  const renderChatItem = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.chatItem}
-      onPress={() => navigation.navigate('ChatScreen', { conversationId: item.id })}
-    >
-      <Image source={{ uri: conversationImages[item.id] }} style={styles.avatar} />
-      <View style={styles.chatInfo}>
-        <View style={styles.chatHeader}>
-          <Text style={styles.chatName}>{conversationNames[item.id] || 'Đang tải...'}</Text>
-          <Text style={styles.chatDate}>{formatDate(item.lastMessageAt)}</Text>
+    // Kiểm tra xem có user nào trong danh sách online không
+    const isOnline = Array.isArray(onlineUsers) && 
+      onlineUsers.some(onlineUser => 
+        otherUserIds.includes(onlineUser.id)
+    );
+  
+    return (
+      <TouchableOpacity 
+        style={styles.chatItem}
+        onPress={() => navigation.navigate('ChatScreen', { conversationId: item.id })}
+      >
+        <View style={styles.avatarWrapper}>
+        {conversationImages[item.id]?.type === 'initial' ? (
+          <View style={[
+            styles.avatarInitial, 
+            { backgroundColor: conversationImages[item.id].backgroundColor }
+          ]}>
+            <Text style={styles.initialText}>
+              {conversationImages[item.id].value}
+            </Text>
+          </View>
+        ) : (
+          <Image 
+            source={{ uri: conversationImages[item.id] || 'https://i.pravatar.cc/100' }} 
+            style={styles.avatar} 
+          />
+        )}
+  
+          {isOnline && (
+            <View style={styles.onlineIndicator} />
+          )}
         </View>
-        <Text style={styles.lastMessage} numberOfLines={1}>
-          {lastMessages[item.id] || 'Bắt đầu trò chuyện'}
-        </Text>
-      </View>
-    </TouchableOpacity>
-  );
+  
+        <View style={styles.chatInfo}>
+          <View style={styles.chatHeader}>
+            <Text style={styles.chatName}>{conversationNames[item.id] || 'Đang tải...'}</Text>
+            <Text style={styles.chatDate}>{formatDate(item.lastMessageAt)}</Text>
+          </View>
+          <Text style={[styles.lastMessage,unseenMessages[item.id] && styles.unseenMessage]} numberOfLines={1}>
+            {lastMessages[item.id] || 'Bắt đầu trò chuyện'}
+          </Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   // Function to validate Vietnamese phone number
   const isValidPhoneNumber = (phone) => {
@@ -327,7 +420,7 @@ const HomePage = ({navigation}) => {
               <UserPlus stroke="#666" width={24} height={24} />
               <Text style={styles.modalText}>Thêm bạn</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.modalItem}>
+            <TouchableOpacity style={styles.modalItem} onPress={()=> {setShowModal(false);nav.navigate('CreateGroupScreen')}}>
               <UsersGroup stroke="#666" width={24} height={24} />
               <Text style={styles.modalText}>Tạo nhóm</Text>
             </TouchableOpacity>
@@ -454,6 +547,7 @@ const styles = StyleSheet.create({
     padding: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
+    overflow: 'visible',
   },
   avatar: {
     width: 50,
@@ -516,6 +610,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     borderRadius: 8,
     padding: 16,
+  },
+  avatarWrapper: {
+    position: 'relative',
+    width: 50,
+    height: 50,
+    marginRight: 10,
   },
   modalItem: {
     flexDirection: 'row',
@@ -654,6 +754,39 @@ const styles = StyleSheet.create({
   errorText: {
     color: 'red',
     textAlign: 'center',
+  },
+  onlineIndicator: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#4CAF50', // màu xanh lá
+    borderWidth: 2,
+    borderColor: '#fff',
+    zIndex: 1, // viền trắng
+  },
+  unseenMessage: {
+    fontWeight: 'bold',
+    color: 'black' // Hoặc màu bạn muốn
+  },
+   avatarInitial: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  initialText: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  avatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
   },
 });
 

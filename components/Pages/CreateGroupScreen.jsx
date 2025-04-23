@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,31 +8,57 @@ import {
   SafeAreaView,
   FlatList,
   Image,
+  ActivityIndicator,
 } from 'react-native';
 import { X, Camera, Search } from 'react-native-feather';
+import ApiService from '../../services/apis';
 
 const CreateGroupScreen = ({ navigation }) => {
   const [groupName, setGroupName] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedFriends, setSelectedFriends] = useState([]);
+  const [friends, setFriends] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
 
-  const friends = [
-    {
-      id: '1',
-      name: 'Tuấn Anh',
-      avatar: 'https://i.pravatar.cc/100?img=1',
-      lastActive: '14 giờ trước',
-    },
-    {
-      id: '2',
-      name: 'Hưng Wibruh',
-      avatar: null,
-      initials: 'HW',
-      lastActive: '15 giờ trước',
-      backgroundColor: '#00bcd4',
-    },
-    // Add more friends as needed
-  ];
+  // const friends = [
+  //   {
+  //     id: '1',
+  //     name: 'Tuấn Anh',
+  //     avatar: 'https://i.pravatar.cc/100?img=1',
+  //     lastActive: '14 giờ trước',
+  //   },
+  //   {
+  //     id: '2',
+  //     name: 'Hưng Wibruh',
+  //     avatar: null,
+  //     initials: 'HW',
+  //     lastActive: '15 giờ trước',
+  //     backgroundColor: '#00bcd4',
+  //   },
+  //   // Add more friends as needed
+  // ];
+
+  // Lấy danh sách bạn bè từ API
+  useEffect(() => {
+    const fetchFriends = async () => {
+      try {
+        const response = await ApiService.getFriendUserLogin();
+        if (response.code === 200) {
+          setFriends(response.data);
+        } else {
+          Alert.alert('Lỗi', 'Không thể lấy danh sách bạn bè');
+        }
+      } catch (error) {
+        console.error('Lỗi khi lấy danh sách bạn bè:', error);
+        Alert.alert('Lỗi', 'Đã xảy ra lỗi khi lấy danh sách bạn bè');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchFriends();
+  }, []);
 
   const toggleFriendSelection = (friendId) => {
     if (selectedFriends.includes(friendId)) {
@@ -42,30 +68,73 @@ const CreateGroupScreen = ({ navigation }) => {
     }
   };
 
+  const handleCreateGroup = async () => {
+    if (selectedFriends.length === 0) {
+      Alert.alert('Lỗi', 'Vui lòng chọn ít nhất một thành viên');
+      return;
+    }
+
+    if (!groupName.trim()) {
+      Alert.alert('Lỗi', 'Vui lòng nhập tên nhóm');
+      return;
+    }
+
+    setIsCreating(true);
+    try {
+      const data = {
+        name: groupName,
+        users: selectedFriends.map(id => ({ id }))
+      };
+
+      const response = await ApiService.createConversation(data);
+      
+      if (response.code === 200) {
+        navigation.navigate('ChatScreen', { conversationId: response.data.id });
+      } else {
+        Alert.alert('Lỗi', response.message || 'Không thể tạo nhóm');
+      }
+    } catch (error) {
+      console.error('Lỗi khi tạo nhóm:', error);
+      Alert.alert('Lỗi', 'Đã xảy ra lỗi khi tạo nhóm');
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   const renderFriendItem = ({ item }) => (
     <TouchableOpacity 
       style={styles.friendItem}
-      onPress={() => toggleFriendSelection(item.id)}
+      onPress={() => toggleFriendSelection(item.friendId)}
     >
       <View style={styles.checkboxContainer}>
         <View style={[
           styles.checkbox,
-          selectedFriends.includes(item.id) && styles.checkboxSelected
+          selectedFriends.includes(item.friendId) && styles.checkboxSelected
         ]} />
       </View>
-      {item.avatar ? (
-        <Image source={{ uri: item.avatar }} style={styles.avatar} />
+      {item.image ? (
+        <Image source={{ uri: item.image }} style={styles.avatar} />
       ) : (
         <View style={[styles.avatarPlaceholder, { backgroundColor: item.backgroundColor || '#ccc' }]}>
-          <Text style={styles.avatarInitials}>{item.initials}</Text>
+          <Text style={styles.avatarInitials}>
+            {item.friendName ? item.friendName.charAt(0) : '?'}
+          </Text>
         </View>
       )}
       <View style={styles.friendInfo}>
-        <Text style={styles.friendName}>{item.name}</Text>
-        <Text style={styles.lastActive}>{item.lastActive}</Text>
+        <Text style={styles.friendName}>{item.friendName}</Text>
+        
       </View>
     </TouchableOpacity>
   );
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#0088ff" />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -107,11 +176,30 @@ const CreateGroupScreen = ({ navigation }) => {
       </View>
 
       <FlatList
-        data={friends}
+        data={friends.filter(friend => 
+          friend.friendName.toLowerCase().includes(searchQuery.toLowerCase())
+        )}
         renderItem={renderFriendItem}
-        keyExtractor={item => item.id}
+        keyExtractor={item => item.friendId}
         style={styles.friendsList}
       />
+
+      {/* Nút tạo nhóm - chỉ hiển thị khi có ít nhất 1 thành viên được chọn */}
+      {selectedFriends.length > 0 && (
+        <View style={styles.footer}>
+          <TouchableOpacity 
+            style={styles.createButton}
+            onPress={handleCreateGroup}
+            disabled={isCreating || !groupName.trim()}
+          >
+            {isCreating ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.createButtonText}>Tạo nhóm</Text>
+            )}
+          </TouchableOpacity>
+        </View>
+      )}
     </SafeAreaView>
   );
 };
@@ -121,6 +209,12 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     height: '100%',
+    backgroundColor: '#fff',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
     backgroundColor: '#fff',
   },
   header: {
@@ -182,6 +276,7 @@ const styles = StyleSheet.create({
   },
   friendsList: {
     flex: 1,
+    marginBottom: 70, // Để tránh bị nút tạo nhóm che phủ
   },
   friendItem: {
     flexDirection: 'row',
@@ -229,10 +324,26 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '500',
   },
-  lastActive: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 2,
+  footer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 16,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+  },
+  createButton: {
+    backgroundColor: '#0088ff',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  createButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

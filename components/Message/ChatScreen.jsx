@@ -23,7 +23,7 @@ import {
   Heart,
   Send,
   File,
-  
+  Menu,
 } from 'react-native-feather';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useWebSocket } from './WebSocketContext';
@@ -37,7 +37,8 @@ import * as mime from 'react-native-mime-types';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { useActionSheet } from "@expo/react-native-action-sheet";
 import Icon from 'react-native-vector-icons/FontAwesome';
-
+import * as DocumentPicker from 'expo-document-picker';
+import { useNavigation } from '@react-navigation/native';
 
 const ChatScreen = ({ navigation, route }) => {
   const { conversationId } = route.params;
@@ -50,6 +51,8 @@ const ChatScreen = ({ navigation, route }) => {
   const {connect, subscribe, sendMessage,disconnect } = useWebSocket();
   const [showEmoji, setShowEmoji] = useState(false);
   const { showActionSheetWithOptions } = useActionSheet();
+  const nav = useNavigation();
+  const [isGroup, setIsGroup] = useState(false);
 
   //foward message
   const [forwardModalVisible, setForwardModalVisible] = useState(false);
@@ -57,6 +60,9 @@ const ChatScreen = ({ navigation, route }) => {
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [selectedConversations, setSelectedConversations] = useState([]);
   const [additionalText, setAdditionalText] = useState('');
+
+  //thông tin chi tiết của conver
+  const [conversationInfo, setConversationInfo] = useState(null);
 
   // Lấy token khi component mount
   useEffect(() => {
@@ -108,6 +114,41 @@ const ChatScreen = ({ navigation, route }) => {
       console.error("Failed to fetch conversations:", error);
     }
   };
+
+  // cập nhật xem tin nhắn
+  useEffect(() => {
+    const markAsSeen = async () => {
+      try {
+        // Chỉ gọi API nếu conversationId hợp lệ và conversation đã có tin nhắn
+        if (conversationId && conversationInfo?.messages?.length > 0) {
+          await ApiService.seenMessage(conversationId);
+        }
+      } catch (error) {
+        if (error.response?.status !== 404) { // Bỏ qua lỗi 404
+          console.error('Error marking as seen:', error);
+        }
+      }
+    };
+    
+    markAsSeen();
+  }, [conversationId, conversationInfo?.messages]);
+
+  // hàm lấy thông tin chi tiết của conver
+  useEffect(() => {
+    if(!conversationId) return;
+
+    const fetchConversationDetails = async () => {
+      try {
+        const response = await ApiService.getConversationById(conversationId);
+        setConversationInfo(response.data);
+        setIsGroup(response.data.isGroup);
+      } catch (err) {
+        console.error("Lỗi khi lấy chi tiết cuộc trò chuyện", err);
+      }
+    };
+  
+    fetchConversationDetails();
+  }, [conversationId]);
 
 
 
@@ -393,6 +434,8 @@ const ChatScreen = ({ navigation, route }) => {
       );
     };
 
+    const showSenderName = isGroup && !item.sent;
+
 
     if (item.type === 'image' && item.imageUrl) {
       return (
@@ -409,6 +452,10 @@ const ChatScreen = ({ navigation, route }) => {
             item.sent ? styles.sentBubble : styles.receivedBubble
             
           ]}>
+
+            {showSenderName && (
+              <Text style={styles.senderName}>{item.user?.name}</Text>
+            )}
             {item.deleted ? (
             <View style={styles.recalledImageContainer}>
               <Text style={styles.recalledText}>Hình ảnh đã được thu hồi</Text>
@@ -449,6 +496,10 @@ const ChatScreen = ({ navigation, route }) => {
           styles.messageBubble,
           item.sent ? styles.sentBubble : styles.receivedBubble
         ]}>
+
+            {showSenderName && (
+              <Text style={styles.senderName}>{item.user?.name}</Text>
+            )}
           <Text style={[
             styles.messageText,
             item.sent ? styles.sentText : styles.receivedText,
@@ -568,6 +619,73 @@ const ChatScreen = ({ navigation, route }) => {
     );
   }
 
+  const handleSendFile = async (fileUri, fileName) => {
+    try {
+      // 1. Tạo tin nhắn tạm
+      const tempId = `temp-${Date.now()}`;
+      setMessages(prev => [{
+        id: tempId,
+        text: '',
+        sent: true,
+        time: moment().format('HH:mm'),
+        type: 'file',
+        fileInfo: {
+          uri: fileUri,
+          name: fileName,
+          size: (FileSystem.getInfoAsync(fileUri)).size
+        },
+        user: { avatar: null, name: 'Bạn' },
+        createdAt: new Date().toISOString(),
+        status: 'uploading'
+      }, ...prev]);
+  
+      // 2. Đọc file thành base64 (giống cách bạn làm với ảnh)
+      const base64 = await FileSystem.readAsStringAsync(fileUri, {
+        encoding: FileSystem.EncodingType.Base64
+      });
+      
+      const mimeType = mime.lookup(fileName) || 'application/pdf';
+      const fullBase64 = `data:${mimeType};base64,${base64}`;
+  
+      // 3. Gửi qua WebSocket NHƯ ẢNH (sử dụng trường image)
+      const success = sendMessage(`/app/chat/${conversationId}`, {
+        message: `[FILE]${fileName}`, // Đánh dấu đây là file + tên file
+        image: fullBase64 // Gửi qua trường image
+      });
+  
+      if (!success) {
+        connect(); // Thử kết nối lại nếu gửi thất bại
+      }
+  
+    } catch (err) {
+      console.error('Lỗi gửi file:', err);
+      setMessages(prev => prev.map(msg => 
+        msg.id.startsWith('temp-') && msg.type === 'file'
+          ? { ...msg, status: 'error', error: err.message || 'Gửi file thất bại' } 
+          : msg
+      ));
+      Alert.alert("Lỗi", err.message || "Không thể gửi file");
+    }
+  };
+
+
+  //hàm xử lý khi nhấn vào nút chọn file gửi
+  const handlePickDocument = async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        type: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+        copyToCacheDirectory: true, // Copy file vào bộ nhớ tạm của app
+      });
+  
+      if (result.type === 'success') {
+        await handleSendFile(result.uri, result.name);
+      }
+    } catch (err) {
+      console.error('Lỗi khi chọn file:', err);
+      Alert.alert('Lỗi', 'Không thể chọn file');
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient
@@ -577,7 +695,7 @@ const ChatScreen = ({ navigation, route }) => {
         <View style={styles.headerContent}>
           <TouchableOpacity 
             style={styles.backButton}
-            onPress={() => {navigation.goBack(),
+            onPress={() => {nav.navigate('Home'),
              disconnect()}
             }
           >
@@ -586,7 +704,13 @@ const ChatScreen = ({ navigation, route }) => {
           
           <View style={styles.headerInfo}>
             <Text style={styles.headerName}>
-              {messages.find(m => !m.sent)?.user?.name || 'Chat'}
+              {
+                conversationInfo
+                ? (conversationInfo.isGroup
+                  ? conversationInfo.name
+                  : conversationInfo.users?.find(user => user.id !== currentUserId)?.name || 'Chat')
+                : 'Đang tải...'
+              }
             </Text>
             <Text style={styles.headerStatus}>Online</Text>
           </View>
@@ -597,6 +721,9 @@ const ChatScreen = ({ navigation, route }) => {
             </TouchableOpacity>
             <TouchableOpacity style={styles.headerButton}>
               <Video stroke="#fff" width={24} height={24} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.headerButton} onPress={() => nav.navigate('Options', {conversationId: conversationId})}>
+              <Menu stroke="#fff" width={24} height={24} />
             </TouchableOpacity>
           </View>
         </View>
@@ -655,7 +782,7 @@ const ChatScreen = ({ navigation, route }) => {
             </TouchableOpacity>
           ) : (
             <View style={styles.attachmentButtons}>
-              <TouchableOpacity style={styles.inputButton}>
+              <TouchableOpacity style={styles.inputButton} onPress={handlePickDocument}>
                 <File stroke="#666" width={24} height={24} />
               </TouchableOpacity>
               <TouchableOpacity 
@@ -870,6 +997,12 @@ const styles = StyleSheet.create({
   },
   messageText: {
     fontSize: 16,
+  },
+  senderName: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 4,
+    fontWeight: 'bold'
   },
   sentText: {
     color: '#000',
