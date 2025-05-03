@@ -573,7 +573,6 @@ export default class ApiService {
   }
 
   //xóa lịch sử trò chuyện
-  //share message
   static async deleteHistoryChat(conversationId) {
     try {
       const headers = await this.getHeader();
