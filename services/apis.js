@@ -6,7 +6,7 @@ import Toast from 'react-native-toast-message';
 import { message } from 'antd-mobile';
 import axiosInstance from './axiosconfig';
 import { Platform,Alert } from 'react-native';
-const BASE_URL = 'http://192.168.1.5:8080/api';
+const BASE_URL = 'http://localhost:8080/api';
 
 
 
@@ -51,7 +51,7 @@ export default class ApiService {
   static async logoutApi() {
     try {
       const headers = await this.getHeader();
-      const response = await axios.get(`${BASE_URL}/auth/loggout`, {
+      const response = await axios.post(`${BASE_URL}/auth/loggout`,{}, {
         headers: headers, 
       });
   

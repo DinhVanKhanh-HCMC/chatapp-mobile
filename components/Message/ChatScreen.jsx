@@ -164,22 +164,27 @@ const ChatScreen = ({ navigation, route }) => {
         // Check if response has the expected structure
         if (response && response.data) {
           // Chuyển đổi dữ liệu từ API sang định dạng phù hợp với UI
-          const formattedMessages = response.data.map(msg => ({
+          const formattedMessages = response.data.map(msg => {
+
+            const isSystemMessage = msg.sender?.id === null || msg.type === 'SYSTEM';
+            
+            return {
             id: msg.id,
             text: msg.deleted ? "Tin nhắn đã được thu hồi" : msg.body, // CHANGED: from body to message
-            sent: msg.sender.id === currentUserId,
+            sent: !isSystemMessage && msg.sender?.id === currentUserId,
             time: moment(msg.createdAt).format('HH:mm'),
-            type: msg.image ? 'image' : 'text', // CHANGED: check for image
+            type: isSystemMessage ? 'system' : msg.image ? 'image' : 'text', // CHANGED: check for image
             imageUrl: msg.image, // CHANGED: from imageUrl to image
             user: {
-              avatar: msg.sender.image || null,
-              name: msg.sender.name || 'Người dùng',
+              avatar: isSystemMessage ? null : msg.sender?.image,
+              name: isSystemMessage ? 'Hệ thống' : msg.sender?.name || 'Người dùng',
             },
             createdAt: msg.createdAt,
             seen: msg.seen || [],
-            senderId: msg.sender.id,
-            deleted: msg.deleted || false
-          }));
+            senderId: isSystemMessage ? null : msg.sender?.id,
+            deleted: msg.deleted || false,
+            isSystem: isSystemMessage
+          }});
   
           // Sắp xếp tin nhắn mới nhất lên đầu (do sử dụng inverted FlatList)
           setMessages(formattedMessages.reverse());
@@ -224,8 +229,12 @@ const ChatScreen = ({ navigation, route }) => {
                 : msg
             );
           }
+
+          // 1. Kiểm tra tin nhắn hệ thống
+          const isSystemMessage = !newMessage.sender || newMessage.senderId === null;
+
           // 1. Tìm và xóa tin nhắn tạm nếu có (nếu là tin nhắn của current user)
-          const isCurrentUserMessage = newMessage.sender.id === currentUserId;
+          const isCurrentUserMessage = !isSystemMessage && newMessage.sender?.id === currentUserId;
           const filteredMessages = isCurrentUserMessage 
             ? prev.filter(msg => !msg.id.startsWith('temp-'))
             : prev;
@@ -241,17 +250,18 @@ const ChatScreen = ({ navigation, route }) => {
           const formattedMessage = {
             id: newMessage.id,
             text: newMessage.body || '',
-            sent: newMessage.sender.id === currentUserId,
+            sent: !isSystemMessage && newMessage.sender?.id === currentUserId,
             time: moment(newMessage.createdAt).format('HH:mm'),
-            type: newMessage.image ? 'image' : 'text',
+            type: isSystemMessage ? 'system' : newMessage.image ? 'image' : 'text',
             imageUrl: newMessage.image || null,
             user: {
-              avatar: newMessage.sender.image,
-              name: newMessage.sender.name || newMessage.sender.username || 'Người dùng',
+              avatar: isSystemMessage ? null : newMessage.sender?.image,
+              name: isSystemMessage ? 'Hệ thống' : newMessage.sender?.name || 'Người dùng',
             },
             createdAt: newMessage.createdAt,
-            senderId: newMessage.sender.id,
-            deleted: newMessage.deleted || false
+            senderId: newMessage.senderId,
+            deleted: newMessage.deleted || false,
+            isSystem: isSystemMessage
           };
   
           // 4. Thêm tin nhắn mới vào đầu danh sách
@@ -385,8 +395,49 @@ const ChatScreen = ({ navigation, route }) => {
     });
   };
 
+  //ham render message system
+  const renderSystemMessage = (item) => {
+    // Xác định icon dựa trên nội dung
+    let icon = 'info';
+    let iconColor = '#888';
+    
+    if (item.text.includes('thêm vào nhóm')) {
+      icon = 'account-plus';
+      iconColor = '#4CAF50';
+    } else if (item.text.includes('rời nhóm')) {
+      icon = 'account-remove';
+      iconColor = '#F44336';
+    } else if (item.text.includes('xóa khỏi nhóm')) {
+      icon = 'account-minus';
+      iconColor = '#FF9800';
+    }
+  
+    return (
+      <View style={styles.systemMessageContainer}>
+        <View style={styles.systemMessageContent}>
+          <Icon 
+            name={icon} 
+            size={16} 
+            color={iconColor} 
+            style={styles.systemIcon}
+          />
+          <Text style={styles.systemMessageText}>
+            {item.text}
+          </Text>
+        </View>
+        <Text style={styles.systemMessageTime}>
+          {item.time}
+        </Text>
+      </View>
+    );
+  };
+
   //hàm render message
   const renderMessage = ({ item }) => {
+
+    if (item.isSystem || item.type === 'system') {
+      return renderSystemMessage(item);
+    }
 
     //thao tác trên từng tin nhắn
     const handleLongPress = () => {
@@ -1270,6 +1321,33 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     borderRadius: 8,
     alignItems: 'center',
+  },
+  systemMessageContainer: {
+    alignSelf: 'center',
+    marginVertical: 8,
+    maxWidth: '80%',
+  },
+  systemMessageContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f0f0f0',
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  systemIcon: {
+    marginRight: 8,
+  },
+  systemMessageText: {
+    color: '#555',
+    fontSize: 14,
+    flexShrink: 1,
+  },
+  systemMessageTime: {
+    alignSelf: 'center',
+    color: '#999',
+    fontSize: 12,
+    marginTop: 4,
   },
 });
 

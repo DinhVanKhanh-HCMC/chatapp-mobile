@@ -126,16 +126,24 @@ const HomePage = ({navigation}) => {
             const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
 
             if (lastMessage) {
-              const isSenderMe = lastMessage.sender.id === currentUserId;
-              const prefix = isSenderMe ? 'Bạn: ' : '';
-              const messageText = lastMessage.deleted ? '[Tin nhắn đã thu hồi]' : lastMessage.body;
-              lastMessagesMap[conversation.id] = prefix + messageText;
-
-              // Kiểm tra tin nhắn chưa đọc
-              unseenMessages[conversation.id] = !isSenderMe && 
-              (!lastMessage.seen || 
-              !lastMessage.seen.some(seenUser => seenUser.id === currentUserId));
-
+              const isSystemMessage = !lastMessage.sender; // hoặc lastMessage.senderId === null
+              let lastMessageText = '';
+              
+              if (isSystemMessage) {
+                lastMessageText = lastMessage.body;
+              } else {
+                const isSenderMe = lastMessage.sender.id === currentUserId;
+                const prefix = isSenderMe ? 'Bạn: ' : '';
+                const messageText = lastMessage.deleted ? '[Tin nhắn đã thu hồi]' : lastMessage.body;
+                lastMessageText = prefix + messageText;
+              }
+            
+              lastMessagesMap[conversation.id] = lastMessageText;
+              
+              // Kiểm tra tin nhắn chưa đọc (bỏ qua system messages)
+              unseenMessages[conversation.id] = !isSystemMessage &&  
+                (!lastMessage.seen || 
+                 !lastMessage.seen.some(seenUser => seenUser.id === currentUserId));
             } else {
               lastMessagesMap[conversation.id] = 'Bắt đầu trò chuyện';
               unseenMessages[conversation.id] = false;
