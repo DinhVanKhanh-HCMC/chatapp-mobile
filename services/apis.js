@@ -6,7 +6,7 @@ import Toast from 'react-native-toast-message';
 import { message } from 'antd-mobile';
 import axiosInstance from './axiosconfig';
 import { Platform,Alert } from 'react-native';
-const BASE_URL = 'http://localhost:8080/api';
+const BASE_URL = 'http://192.168.1.5:8080/api';
 
 
 

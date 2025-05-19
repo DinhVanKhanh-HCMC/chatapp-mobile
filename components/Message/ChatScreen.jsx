@@ -12,7 +12,9 @@ import {
   Platform,
   ActivityIndicator,
   Alert,
-  Modal, 
+  Modal,
+  Linking
+
 } from 'react-native';
 import { 
   ChevronLeft,
@@ -24,6 +26,7 @@ import {
   Send,
   File,
   Menu,
+  
 } from 'react-native-feather';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useWebSocket } from './WebSocketContext';
@@ -36,9 +39,9 @@ import * as FileSystem from 'expo-file-system';
 import * as mime from 'react-native-mime-types';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { useActionSheet } from "@expo/react-native-action-sheet";
-import Icon from 'react-native-vector-icons/FontAwesome';
 import * as DocumentPicker from 'expo-document-picker';
 import { useNavigation } from '@react-navigation/native';
+import Icon from 'react-native-vector-icons/FontAwesome5';
 
 const ChatScreen = ({ navigation, route }) => {
   const { conversationId } = route.params;
@@ -150,6 +153,49 @@ const ChatScreen = ({ navigation, route }) => {
     fetchConversationDetails();
   }, [conversationId]);
 
+  //ham lay loai file
+  const getFileType = (url) => {
+    if (!url) return null;
+    
+    // Lấy phần cuối cùng của URL sau dấu /
+    const filename = url.split('/').pop();
+    
+    // Tách phần mở rộng file (lấy phần sau dấu . cuối cùng)
+    const extension = filename.split('.').pop().split('?')[0].toLowerCase();
+    
+    // Danh sách các loại file hỗ trợ
+    const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+    const videoExtensions = ['mp4', 'mov', 'avi', 'mkv'];
+    const documentExtensions = ['pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'];
+    
+    if (imageExtensions.includes(extension)) return 'image';
+    if (videoExtensions.includes(extension)) return 'video';
+    if (documentExtensions.includes(extension)) return 'file';
+    
+    return null;
+  };
+
+  const getFileIconColor = (fileExtension) => {
+  switch(fileExtension) {
+    case 'pdf': return '#FF0000'; // Màu đỏ cho PDF
+    case 'doc':
+    case 'docx': return '#2B579A'; // Xanh dương cho Word
+    case 'xls':
+    case 'xlsx': return '#217346'; // Xanh lá cho Excel
+    case 'ppt':
+    case 'pptx': return '#D24726'; // Cam đỏ cho PowerPoint
+    default: return '#666'; // Màu xám cho file khác
+  }
+};
+
+const handleOpenFile = (fileUrl) => {
+  // Sử dụng thư viện như react-native-file-viewer
+  // hoặc mở bằng ứng dụng bên ngoài
+  Linking.openURL(fileUrl).catch(err => {
+    console.error('Failed to open file:', err);
+    Alert.alert('Lỗi', 'Không thể mở file này');
+  });
+};
 
 
   // Lấy toàn bộ tin nhắn của conversation
@@ -167,13 +213,20 @@ const ChatScreen = ({ navigation, route }) => {
           const formattedMessages = response.data.map(msg => {
 
             const isSystemMessage = msg.sender?.id === null || msg.type === 'SYSTEM';
+
+            // Xác định loại nội dung
+            let messageType = 'text';
+            if (msg.image) {
+              const fileType = getFileType(msg.image);
+              if (fileType) messageType = fileType;
+            }
             
             return {
             id: msg.id,
             text: msg.deleted ? "Tin nhắn đã được thu hồi" : msg.body, // CHANGED: from body to message
             sent: !isSystemMessage && msg.sender?.id === currentUserId,
             time: moment(msg.createdAt).format('HH:mm'),
-            type: isSystemMessage ? 'system' : msg.image ? 'image' : 'text', // CHANGED: check for image
+            type: isSystemMessage ? 'system' : messageType, // CHANGED: check for image
             imageUrl: msg.image, // CHANGED: from imageUrl to image
             user: {
               avatar: isSystemMessage ? null : msg.sender?.image,
@@ -245,6 +298,13 @@ const ChatScreen = ({ navigation, route }) => {
             console.log('Skipping duplicate message');
             return filteredMessages;
           }
+
+          // Xác định loại nội dung
+          let messageType = 'text';
+          if (newMessage.image) {
+            const fileType = getFileType(newMessage.image);
+            if (fileType) messageType = fileType;
+          }
   
           // 3. Format tin nhắn mới
           const formattedMessage = {
@@ -252,7 +312,7 @@ const ChatScreen = ({ navigation, route }) => {
             text: newMessage.body || '',
             sent: !isSystemMessage && newMessage.sender?.id === currentUserId,
             time: moment(newMessage.createdAt).format('HH:mm'),
-            type: isSystemMessage ? 'system' : newMessage.image ? 'image' : 'text',
+            type: isSystemMessage ? 'system' : messageType,
             imageUrl: newMessage.image || null,
             user: {
               avatar: isSystemMessage ? null : newMessage.sender?.image,
@@ -395,6 +455,8 @@ const ChatScreen = ({ navigation, route }) => {
     });
   };
 
+  
+
   //ham render message system
   const renderSystemMessage = (item) => {
     // Xác định icon dựa trên nội dung
@@ -430,6 +492,24 @@ const ChatScreen = ({ navigation, route }) => {
         </Text>
       </View>
     );
+  };
+
+  const getFileIcon = (fileType) => {
+  switch(fileType) {
+    case 'pdf':
+      return 'file-pdf';
+    case 'doc':
+    case 'docx':
+      return 'file-word';
+    case 'xls':
+    case 'xlsx':
+      return 'file-excel';
+    case 'ppt':
+    case 'pptx':
+      return 'file-powerpoint';
+    default:
+      return 'file';
+  }
   };
 
   //hàm render message
@@ -488,7 +568,13 @@ const ChatScreen = ({ navigation, route }) => {
 
 
     //nếu tin nhắn là file
-    if (item.type === 'file' && item.fileInfo) {
+    if (item.type === 'file' && item.imageUrl) {
+      // Lấy tên file từ URL
+      const fileName = item.body || item.imageUrl?.split('/').pop() || 'Không rõ tên file';
+
+      // Xác định loại file từ extension
+      const fileExtension = fileName.split('.').pop().toLowerCase();
+      
       return (
         <TouchableOpacity onLongPress={handleLongPress}>
           <View style={[
@@ -505,33 +591,37 @@ const ChatScreen = ({ navigation, route }) => {
               {showSenderName && (
                 <Text style={styles.senderName}>{item.user?.name}</Text>
               )}
+              
               {item.deleted ? (
                 <View style={styles.recalledFileContainer}>
                   <Text style={styles.recalledText}>File đã được thu hồi</Text>
                 </View>
               ) : (
+                <>
+                <Text>{fileName}</Text>
                 <TouchableOpacity 
                   style={styles.fileContainer}
-                  onPress={() => handleOpenFile(item.fileInfo)}
+                  onPress={() => handleOpenFile(item.imageUrl)}
                 >
-                  <Icon name="file" size={24} color="#555" />
+                  <Icon 
+                    name={getFileIcon(fileExtension)} 
+                    size={24} 
+                    color={getFileIconColor(fileExtension)} 
+                  />
                   <View style={styles.fileInfo}>
                     <Text style={styles.fileName} numberOfLines={1}>
-                      {item.fileInfo.name}
+                      {fileName}
                     </Text>
                     <Text style={styles.fileSize}>
-                      {formatFileSize(item.fileInfo.size)}
+                      {item.size ? formatFileSize(item.size) : 'Unknown size'}
                     </Text>
                   </View>
                 </TouchableOpacity>
+                </>
               )}
               <Text style={styles.timeText}>{item.time}</Text>
+              
             </View>
-            {item.reactions && (
-              <View style={styles.reactionContainer}>
-                <Heart fill="#ff0000" stroke="#ff0000" width={16} height={16} />
-              </View>
-            )}
           </View>
         </TouchableOpacity>
       );
@@ -587,6 +677,58 @@ const ChatScreen = ({ navigation, route }) => {
       </TouchableOpacity>
       );
       
+    }
+
+    // Nếu tin nhắn là video
+    if (item.type === 'video' && item.imageUrl) {
+      return (
+        <TouchableOpacity onLongPress={handleLongPress}>
+          <View style={[
+            styles.messageContainer,
+            item.sent ? styles.sentMessage : styles.receivedMessage
+          ]}>
+            {!item.sent && item.user?.avatar && (
+              <Image source={{ uri: item.user.avatar }} style={styles.avatar} />
+            )}
+            <View style={[
+              styles.videoBubble,
+              item.sent ? styles.sentBubble : styles.receivedBubble
+            ]}>
+              {showSenderName && (
+                <Text style={styles.senderName}>{item.user?.name}</Text>
+              )}
+              {item.deleted ? (
+                <View style={styles.recalledImageContainer}>
+                  <Text style={styles.recalledText}>Video đã được thu hồi</Text>
+                </View>
+              ) : (
+                <>
+                  <TouchableOpacity 
+                    onPress={() => handleOpenVideo(item.imageUrl)}
+                    style={styles.videoContainer}
+                  >
+                    <Video
+                      source={{ uri: item.imageUrl }}
+                      style={styles.videoThumbnail}
+                      paused={true}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.playButton}>
+                      <Icon name="play" size={30} color="white" />
+                    </View>
+                  </TouchableOpacity>
+                </>
+              )}
+              <Text style={styles.timeText}>{item.time}</Text>
+            </View>
+            {item.reactions && (
+              <View style={styles.reactionContainer}>
+                <Heart fill="#ff0000" stroke="#ff0000" width={16} height={16} />
+              </View>
+            )}
+          </View>
+        </TouchableOpacity>
+      );
     }
     
     return (
@@ -725,94 +867,119 @@ const ChatScreen = ({ navigation, route }) => {
     );
   }
 
+
+  //ham gui file
   const handleSendFile = async (fileUri, fileName) => {
-    try {
-      // 1. Tạo tin nhắn tạm
-      const tempId = `temp-${Date.now()}`;
-      setMessages(prev => [{
-        id: tempId,
-        text: '',
-        sent: true,
-        time: moment().format('HH:mm'),
-        type: 'file',
-        fileInfo: {
-          uri: fileUri,
-          name: fileName,
-          size: (FileSystem.getInfoAsync(fileUri)).size
-        },
-        user: { avatar: null, name: 'Bạn' },
-        createdAt: new Date().toISOString(),
-        status: 'uploading'
-      }, ...prev]);
-  
-      // 2. Đọc file thành base64 (giống cách bạn làm với ảnh)
-      const base64 = await FileSystem.readAsStringAsync(fileUri, {
-        encoding: FileSystem.EncodingType.Base64
-      });
-      
-      const mimeType = mime.lookup(fileName) || 'application/pdf';
-      const fullBase64 = `data:${mimeType};base64,${base64}`;
-  
-      // 3. Gửi qua WebSocket NHƯ ẢNH (sử dụng trường image)
-      const success = sendMessage(`/app/chat/${conversationId}`, {
-        message: `[FILE]${fileName}`, // Đánh dấu đây là file + tên file
-        image: fullBase64 // Gửi qua trường image
-      });
-  
-      if (!success) {
-        connect(); // Thử kết nối lại nếu gửi thất bại
-      }
-  
-    } catch (err) {
-      console.error('Lỗi gửi file:', err);
-      setMessages(prev => prev.map(msg => 
-        msg.id.startsWith('temp-') && msg.type === 'file'
-          ? { ...msg, status: 'error', error: err.message || 'Gửi file thất bại' } 
-          : msg
-      ));
-      Alert.alert("Lỗi", err.message || "Không thể gửi file");
+  try {
+    console.log('Bắt đầu gửi file:', fileName);
+    
+    // 1. Kiểm tra file info
+    const fileInfo = await FileSystem.getInfoAsync(fileUri);
+    console.log('Thông tin file:', fileInfo);
+    
+    if (!fileInfo.exists) {
+      throw new Error('File không tồn tại');
     }
-  };
 
+    // 2. Tạo tin nhắn tạm
+    const tempId = `temp-${Date.now()}`;
+    setMessages(prev => [{
+      id: tempId,
+      text: '',
+      sent: true,
+      time: moment().format('HH:mm'),
+      type: 'file',
+      fileInfo: {
+        uri: fileUri,
+        name: fileName,
+        size: fileInfo.size
+      },
+      user: { avatar: null, name: 'Bạn' },
+      createdAt: new Date().toISOString(),
+      status: 'uploading'
+    }, ...prev]);
 
-  //hàm xử lý khi nhấn vào nút chọn file gửi
+    // 3. Đọc file thành base64
+    console.log('Đang đọc file...');
+    const base64 = await FileSystem.readAsStringAsync(fileUri, {
+      encoding: FileSystem.EncodingType.Base64
+    });
+    
+    console.log('Đã đọc file thành base64, độ dài:', base64.length);
+    
+    const mimeType = mime.lookup(fileName) || 'application/octet-stream';
+    const fullBase64 = `data:${mimeType};base64,${base64}`;
+    
+    console.log('Chuẩn bị gửi qua WebSocket...');
+
+    // 4. Gửi qua WebSocket
+    const success = sendMessage(`/app/chat/${conversationId}`, {
+      message: `[FILE]${fileName}`,
+      image: fullBase64
+    });
+    
+    console.log('Kết quả gửi WebSocket:', success);
+    
+    if (!success) {
+      throw new Error('Gửi qua WebSocket thất bại');
+    }
+
+  } catch (err) {
+    console.error('Lỗi trong quá trình gửi file:', err);
+    setMessages(prev => prev.map(msg => 
+      msg.id.startsWith('temp-') && msg.type === 'file'
+        ? { ...msg, status: 'error', error: err.message || 'Gửi file thất bại' } 
+        : msg
+    ));
+    Alert.alert("Lỗi", err.message || "Không thể gửi file");
+  }
+};
+
+  //ham chon file
   const handlePickDocument = async () => {
-    try {
-      const result = await DocumentPicker.getDocumentAsync({
-        type: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
-        copyToCacheDirectory: true, // Copy file vào bộ nhớ tạm của app
-      });
-  
-      if (result.type === 'success') {
-        await handleSendFile(result.uri, result.name);
-      }
-    } catch (err) {
-      console.error('Lỗi khi chọn file:', err);
-      Alert.alert('Lỗi', 'Không thể chọn file');
-    }
-  };
+  try {
+    const result = await DocumentPicker.getDocumentAsync({
+    type: ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'],
+    copyToCacheDirectory: true,
+  });
+
+  console.log('✅ Kết quả chọn file:', result);
+
+  if (!result.canceled && result.assets && result.assets.length > 0) {
+    const file = result.assets[0];
+    console.log('📄 File đã chọn:', file);
+    await handleSendFile(file.uri, file.name);
+  } else {
+    console.log('❌ Người dùng đã hủy chọn file');
+  }
+
+  } catch (err) {
+    console.error('Lỗi khi chọn file:', err);
+    Alert.alert('Lỗi', 'Không thể chọn file');
+  }
+};
 
   //hàm xử lý mở file
-  const handleOpenFile = async (fileInfo) => {
-    try {
-      // Kiểm tra quyền truy cập file trước
-      const fileUri = fileInfo.uri;
-      const fileExists = await FileSystem.getInfoAsync(fileUri);
+  // const handleOpenFile = async (fileInfo) => {
+  //   try {
+  //     // Kiểm tra quyền truy cập file trước
+  //     const fileUri = fileInfo.uri;
+  //     const fileExists = await FileSystem.getInfoAsync(fileUri);
       
-      if (!fileExists.exists) {
-        throw new Error('File không tồn tại');
-      }
+  //     if (!fileExists.exists) {
+  //       throw new Error('File không tồn tại');
+  //     }
   
-      // Mở file với ứng dụng phù hợp
-      await Sharing.shareAsync(fileUri, {
-        mimeType: mime.lookup(fileInfo.name) || 'application/pdf',
-        dialogTitle: `Mở ${fileInfo.name}`,
-      });
-    } catch (error) {
-      console.error('Lỗi mở file:', error);
-      Alert.alert('Lỗi', 'Không thể mở file này');
-    }
-  };
+  //     // Mở file với ứng dụng phù hợp
+  //     await Sharing.shareAsync(fileUri, {
+  //       mimeType: mime.lookup(fileInfo.name) || 'application/pdf',
+  //       dialogTitle: `Mở ${fileInfo.name}`,
+  //     });
+  //   } catch (error) {
+  //     console.error('Lỗi mở file:', error);
+  //     Alert.alert('Lỗi', 'Không thể mở file này');
+  //   }
+  // };
   
   // Hàm định dạng kích thước file
   const formatFileSize = (bytes) => {
@@ -1348,6 +1515,36 @@ const styles = StyleSheet.create({
     color: '#999',
     fontSize: 12,
     marginTop: 4,
+  },
+  videoBubble: {
+    maxWidth: '80%',
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 8,
+  },
+  videoContainer: {
+    width: 200,
+    height: 150,
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+    backgroundColor: '#000',
+  },
+  videoThumbnail: {
+    width: '100%',
+    height: '100%',
+  },
+  playButton: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    transform: [{ translateX: -15 }, { translateY: -15 }],
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    width: 30,
+    height: 30,
+    borderRadius: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

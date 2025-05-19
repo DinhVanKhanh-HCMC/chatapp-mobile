@@ -20,7 +20,7 @@
     "axios": "^1.8.1",
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.7",
-    "expo": "~52.0.37",
+    "expo": "^52.0.22",
     "expo-document-picker": "^13.0.3",
     "expo-file-system": "^18.0.12",
     "expo-image-manipulator": "^13.0.6",
