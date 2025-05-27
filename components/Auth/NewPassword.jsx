@@ -93,6 +93,12 @@ const NewPassword = ({ navigation }) => {
           />
         </View>
 
+        {formData.password.length > 0 && formData.password.length < 6 && (
+          <Text style={styles.errorText}>
+            Mật khẩu phải có ít nhất 6 ký tự
+          </Text>
+        )}
+
         {formData.password !== confirmPassword && confirmPassword !== '' && (
           <Text style={styles.errorText}>
             Mật khẩu không khớp

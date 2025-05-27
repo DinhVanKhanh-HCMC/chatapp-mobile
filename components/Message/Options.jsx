@@ -218,19 +218,27 @@ const handleCloseAddMember = (needRefresh) => {
     </TouchableOpacity>
   );
 
+  
+
 
   //ham xử lý khi nhấn giữ thành viên
   const handleLongPress = (selectedMember) => {
-    const options = ["Xóa khỏi nhóm", "Chuyển quyền nhóm trưởng", "Hủy"];
-    const cancelButtonIndex = 2;
+    const currentMember = members.find(m => m.id === currentUserId);
+    const isAdmin = currentMember?.role === 'ADMIN';
+
+    const options = isAdmin
+    ? ["Xóa khỏi nhóm", "Chuyển quyền nhóm trưởng", "Hủy"]
+    : ["Hủy"];
+  const cancelButtonIndex = isAdmin ? 2 : 0;
     
     showActionSheetWithOptions(
       { options, cancelButtonIndex },
       async (buttonIndex) => {
+        if (!isAdmin) return;
         if (buttonIndex === 0) {
           if (!currentUserId || !members) return;
   
-          const currentMember = members.find(m => m.id === currentUserId);
+          
   
           if (!currentMember || currentMember.role !== 'ADMIN') {
             Alert.alert("Bạn không có quyền!", "Chỉ trưởng nhóm mới có thể xóa thành viên.");

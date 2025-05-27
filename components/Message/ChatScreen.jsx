@@ -319,7 +319,7 @@ const handleOpenFile = (fileUrl) => {
               name: isSystemMessage ? 'Hệ thống' : newMessage.sender?.name || 'Người dùng',
             },
             createdAt: newMessage.createdAt,
-            senderId: newMessage.senderId,
+            senderId: isSystemMessage ? null : newMessage.sender?.id,
             deleted: newMessage.deleted || false,
             isSystem: isSystemMessage
           };
@@ -570,7 +570,7 @@ const handleOpenFile = (fileUrl) => {
     //nếu tin nhắn là file
     if (item.type === 'file' && item.imageUrl) {
       // Lấy tên file từ URL
-      const fileName = item.body || item.imageUrl?.split('/').pop() || 'Không rõ tên file';
+      const fileName = item?.body || item.imageUrl?.split('/').pop() || 'Không rõ tên file';
 
       // Xác định loại file từ extension
       const fileExtension = fileName.split('.').pop().toLowerCase();
@@ -598,7 +598,7 @@ const handleOpenFile = (fileUrl) => {
                 </View>
               ) : (
                 <>
-                <Text>{fileName}</Text>
+                <Text>{item.text}</Text>
                 <TouchableOpacity 
                   style={styles.fileContainer}
                   onPress={() => handleOpenFile(item.imageUrl)}

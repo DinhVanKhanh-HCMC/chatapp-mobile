@@ -63,6 +63,7 @@ const Register = ({ navigation }) => {
       if (response?.code === 200) {
         console.log('Storing email and navigating...');
         await AsyncStorage.setItem("email", email);
+        const expireAt = Date.now() + 60 * 1000;
         setConfirmation(true);
         
         const serverOtp = response.data.otp;
@@ -71,7 +72,9 @@ const Register = ({ navigation }) => {
         }
         nav.navigate('EmailVerification', {
           serverOtp,
-          mode: 'register'
+          mode: 'register',
+          expireAt,
+          email
         });
       } else if(response?.code === 409) {
         Alert.alert('Lỗi', response.data.message || 'Có lỗi xảy ra');

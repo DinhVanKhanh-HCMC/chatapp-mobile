@@ -39,9 +39,10 @@ const ForgetPassword = ({ navigation }) => {
       if (response?.code === 200) {
         Alert.alert(response.message)
         await AsyncStorage.setItem("email", email);
+        const expireAt = Date.now() + 60 * 1000;
         setConfirmation(true);
         const serverOtp = response.data.otp;
-        nav.navigate('EmailVerification',{serverOtp: serverOtp,mode: 'reset'});
+        nav.navigate('EmailVerification',{serverOtp: serverOtp,mode: 'reset',expireAt,email});
       }
     }catch(err){
       Alert.alert('Lỗi','Email không tồn tại!')

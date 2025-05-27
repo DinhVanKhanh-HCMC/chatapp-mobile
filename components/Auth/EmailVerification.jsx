@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect,useRef } from 'react';
 import {
   View,
   Text,
@@ -11,43 +11,54 @@ import {
 import useBackHandler from '../../hook/useBackHandle';
 import { useNavigation } from '@react-navigation/native';
 import { showMessage } from 'antd-mobile';
-import { useRoute } from '@react-navigation/native';
+import { useRoute,useIsFocused } from '@react-navigation/native';
 import {Toast} from 'react-native-toast-message';
+import ApiService from '../../services/apis';
 
 
 
 
 const EmailVerification = ({ navigation }) => {
-  const [timer, setTimer] = useState(30);
+  const route = useRoute();
+  const {expireAt} = route.params;
+  const now = Date.now();
+  const [timer, setTimer] = useState(Math.max(Math.floor((expireAt - now) / 1000), 0));
   const [isResendActive, setIsResendActive] = useState(false);
-  const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
   const [confirmation, setConfirmation] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const route = useRoute();
+  const isMountedRef = useRef(true);
+  
   const {serverOtp} = route.params;
-  const {mode} = route.params;
+  const {email,mode} = route.params;
+   const isFocused = useIsFocused();
 
   useBackHandler();
   const nav = useNavigation();
 
+
   // Timer countdown effect
   useEffect(() => {
     let interval = null;
-    if (timer > 0) {
+
+    if (isFocused && timer > 0) { // Chỉ chạy timer nếu màn hình đang active
       interval = setInterval(() => {
-        setTimer((prevTimer) => prevTimer - 1);
+        setTimer(prev => prev - 1);
       }, 1000);
-    } else {
+    } else if (isFocused && timer === 0) { // Chỉ hiện Alert nếu màn hình đang active
       setIsResendActive(true);
+      Alert.alert('Thông báo', 'Mã OTP đã hết hạn!');
     }
-    return () => clearInterval(interval);
-  }, [timer]);
+
+    return () => clearInterval(interval); // Hủy interval khi unmount hoặc mất focus
+  }, [timer, isFocused]);
 
   const handleVerification = () => {
     // Handle verification logic here
     console.log('Verifying code:');
   };
+
+  
 
   //form du lieu gui di
   const handleChange = (name, value) => {
@@ -58,34 +69,52 @@ const EmailVerification = ({ navigation }) => {
   };
 
   // Hàm xác thực OTP
-  const handleVerifyOTP = () => {
+  const handleVerifyOTP = async () => {
     if (otp.trim() === '') {
       Alert.alert('Error','Vui lòng nhập OTP!')
       return;
     }
-    if (otp === serverOtp) {
-      // Toast.show({
-      //   icon: 'success',
-      //   content: 'Xác thực OTP thành công!'
-      // });
 
-      Alert.alert('Thông báo','Xác thực thành công')
-      if (mode === 'register') {
-        nav.navigate("RegisProfile")
-      } else if (mode === 'reset') {
-        nav.navigate("NewPassword")
+    try {
+      const response = await ApiService.verifyOtp(email, otp);
+      if (response?.code === 200) {
+        // Toast.show({
+        //   icon: 'success',
+        //   content: 'Xác thực OTP thành công!'
+        // });
+
+        Alert.alert('Thông báo',response?.message )
+        if (mode === 'register') {
+          nav.navigate("RegisProfile")
+        } else if (mode === 'reset') {
+          nav.navigate("NewPassword")
+        }
+      } else{
+        Alert.alert('Thông báo',response?.message || 'Mã OTP không đúng hoặc đã hết hạn')
       }
-    } else {
-      Alert.alert('error','Mã OTP không đúng!')
+    } catch (error) {
+      console.error("OTP verify error:", error);
+      Alert.alert('Lỗi', 'Đã xảy ra lỗi khi xác thực OTP. Vui lòng thử lại.');
     }
+
+    
   };
 
 
-  const handleResendCode = () => {
-    setTimer(53);
-    setIsResendActive(false);
-    // Handle resend logic here
-    console.log('Resending verification code');
+  const handleResendCode = async () => {
+    try {
+    const response = await ApiService.sendOTP(email, mode); // bạn cần truyền lại email (từ AsyncStorage hoặc truyền qua params)
+    if (response?.code === 200) {
+      const newExpireAt = Date.now() + 60 * 1000;
+      setTimer(60); // hoặc tính từ newExpireAt như trên
+      setIsResendActive(false);
+    } else {
+      Alert.alert("Lỗi", "Không thể gửi lại mã OTP");
+    }
+  } catch (err) {
+    console.error(err)
+    Alert.alert("Lỗi", "Gửi lại OTP thất bại");
+  }
   };
 
   return (

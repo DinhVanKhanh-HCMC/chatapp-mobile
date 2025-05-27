@@ -6,7 +6,7 @@ import Toast from 'react-native-toast-message';
 import { message } from 'antd-mobile';
 import axiosInstance from './axiosconfig';
 import { Platform,Alert } from 'react-native';
-const BASE_URL = 'http://192.168.1.5:8080/api';
+const BASE_URL = 'http://192.168.1.6:8080/api';
 
 
 
@@ -127,6 +127,19 @@ export default class ApiService {
       }
   
       throw error; // để `handleSendOTP` biết là lỗi
+    }
+  }
+
+  //verify otp
+  static async verifyOtp(email,otp) {
+    try {
+      const response = await axios.post(
+        `${BASE_URL}/otp/verifyOTP`,{},
+        {params: {Email: email, otp: otp}}
+      );
+      return response.data;
+    } catch (error) {
+      console.error(error)
     }
   }
 
