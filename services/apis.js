@@ -6,7 +6,7 @@ import Toast from 'react-native-toast-message';
 import { message } from 'antd-mobile';
 import axiosInstance from './axiosconfig';
 import { Platform,Alert } from 'react-native';
-const BASE_URL = 'http://192.168.1.6:8080/api';
+const BASE_URL = 'https://nhom10iuh.id.vn/api';
 
 
 
@@ -71,7 +71,7 @@ export default class ApiService {
             headers: { "Content-Type": "multipart/form-data" }
         });
 
-        return response; // Trả về response để xử lý ở handleSubmit
+        return response.data; // Trả về response để xử lý ở handleSubmit
     } catch (error) {
       //console.error("❌ Error saving profile:", error.response?.data?.message || error.message);
       // Toast.show({
@@ -278,6 +278,45 @@ export default class ApiService {
       return response.data;
     } catch (error) {
       message.error('Lỗi khi gọi api xóa thành viên:', error);
+    }
+  }
+
+  //lay tin nhan da ghim
+  static async getPinMessage(conversationId) {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.get(`${BASE_URL}/conversation/${conversationId}/pin`, {
+        headers: headers,
+      });
+      return response.data;
+    } catch (error) {
+      message.error('Lỗi khi gọi api get pin message:', error);
+    }
+  }
+
+  //lay tin nhan da ghim
+  static async pinMessage(conversationId,messageId) {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.post(`${BASE_URL}/conversation/${conversationId}/pin/${messageId}`,{}, {
+        headers: headers,
+      });
+      return response.data;
+    } catch (error) {
+      message.error('Lỗi khi gọi api pin message:', error);
+    }
+  }
+
+  //xoa tin nhan da ghim
+  static async deletePinMessage(conversationId) {
+    try {
+      const headers = await this.getHeader();
+      const response = await axios.delete(`${BASE_URL}/conversation/${conversationId}/delete/pin`, {
+        headers: headers,
+      });
+      return response.data;
+    } catch (error) {
+      message.error('Lỗi khi gọi api delete pin message:', error);
     }
   }
 

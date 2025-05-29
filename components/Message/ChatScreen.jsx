@@ -13,7 +13,8 @@ import {
   ActivityIndicator,
   Alert,
   Modal,
-  Linking
+  Linking,
+  
 
 } from 'react-native';
 import { 
@@ -26,6 +27,8 @@ import {
   Send,
   File,
   Menu,
+  MapPin,
+  XSquare
   
 } from 'react-native-feather';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -43,6 +46,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import { useNavigation } from '@react-navigation/native';
 import Icon from 'react-native-vector-icons/FontAwesome5';
 
+
 const ChatScreen = ({ navigation, route }) => {
   const { conversationId } = route.params;
   const [message, setMessage] = useState('');
@@ -56,6 +60,7 @@ const ChatScreen = ({ navigation, route }) => {
   const { showActionSheetWithOptions } = useActionSheet();
   const nav = useNavigation();
   const [isGroup, setIsGroup] = useState(false);
+  const [pinnedMessage, setPinnedMessage] = useState(null);
 
   //foward message
   const [forwardModalVisible, setForwardModalVisible] = useState(false);
@@ -66,6 +71,12 @@ const ChatScreen = ({ navigation, route }) => {
 
   //thông tin chi tiết của conver
   const [conversationInfo, setConversationInfo] = useState(null);
+
+  const [playingVideoId, setPlayingVideoId] = useState(null);
+
+  const handleOpenVideo = (videoId) => {
+    setPlayingVideoId(playingVideoId === videoId ? null : videoId);
+  };
 
   // Lấy token khi component mount
   useEffect(() => {
@@ -187,6 +198,67 @@ const ChatScreen = ({ navigation, route }) => {
     default: return '#666'; // Màu xám cho file khác
   }
 };
+
+// Lấy tin nhắn đã ghim
+const fetchPinnedMessage = async () => {
+  try {
+    const response = await ApiService.getPinMessage(conversationId);
+    if (response.data) {
+      setPinnedMessage(response.data);
+    } else {
+      setPinnedMessage(null);
+    }
+  } catch (error) {
+    setPinnedMessage(null);
+  }
+};
+
+// Ghim tin nhắn
+const handlePinMessage = async (messageId) => {
+  try {
+    await ApiService.pinMessage(conversationId,messageId)
+    fetchPinnedMessage(); // Làm mới tin nhắn ghim
+    // Có thể thêm thông báo thành công
+  } catch (error) {
+    console.error("Error pinning message:", error);
+    // Hiển thị thông báo lỗi
+    alert("Đã có tin nhắn được ghim, chỉ được ghim 1 tin nhắn duy nhất");
+  }
+};
+
+// Bỏ ghim tin nhắn
+const handleUnpinMessage = async () => {
+  try {
+    await ApiService.deletePinMessage(conversationId);
+    setPinnedMessage(null);
+    // Có thể thêm thông báo thành công
+  } catch (error) {
+    console.error("Error unpinning message:", error);
+    // Hiển thị thông báo lỗi
+  }
+};
+
+// Nhảy đến tin nhắn đã ghim
+const scrollToPinnedMessage = () => {
+  if (pinnedMessage && messages) {
+    const index = messages.findIndex(m => m.id === pinnedMessage.id);
+    if (index !== -1) {
+      flatListRef.current?.scrollToIndex({ 
+        index, 
+        animated: true,
+        viewPosition: 0.5 // Cuộn đến giữa màn hình
+      });
+    } else {
+      // Nếu không tìm thấy trong danh sách hiện tại
+      alert("Tin nhắn đã ghim không có trong danh sách hiển thị");
+    }
+  }
+};
+
+// Gọi khi component mount
+useEffect(() => {
+  fetchPinnedMessage();
+}, [conversationId]);
 
 const handleOpenFile = (fileUrl) => {
   // Sử dụng thư viện như react-native-file-viewer
@@ -464,10 +536,10 @@ const handleOpenFile = (fileUrl) => {
     let iconColor = '#888';
     
     if (item.text.includes('thêm vào nhóm')) {
-      icon = 'account-plus';
+      icon = 'user-plus';
       iconColor = '#4CAF50';
-    } else if (item.text.includes('rời nhóm')) {
-      icon = 'account-remove';
+    } else if (item.text.includes('đã rời nhóm')) {
+      icon = 'user-minus';
       iconColor = '#F44336';
     } else if (item.text.includes('xóa khỏi nhóm')) {
       icon = 'account-minus';
@@ -521,13 +593,11 @@ const handleOpenFile = (fileUrl) => {
 
     //thao tác trên từng tin nhắn
     const handleLongPress = () => {
-
-      // const options = ["Xóa", "Thu hồi", "Chuyển tiếp", "Hủy"];
-      // const cancelButtonIndex = 3;
       const isMyMessage = item.senderId === currentUserId;
       const isRecalled = item.deleted;
+      const isPinned = pinnedMessage?.id === item.id;
 
-      if(isRecalled){
+      if (isRecalled) {
         const options = ["Xóa", "Hủy"];
         const cancelButtonIndex = 1;
         
@@ -540,14 +610,16 @@ const handleOpenFile = (fileUrl) => {
         return;
       }
       
-      
-      
-      
       const options = isMyMessage 
-        ? ["Xóa", "Thu hồi", "Chuyển tiếp", "Hủy"]
-        : ["Xóa", "Chuyển tiếp", "Hủy"];
+        ? isPinned 
+          ? ["Xóa", "Thu hồi", "Chuyển tiếp", "Bỏ ghim", "Hủy"]
+          : ["Xóa", "Thu hồi", "Chuyển tiếp", "Ghim", "Hủy"]
+        : isPinned 
+          ? ["Xóa", "Chuyển tiếp", "Bỏ ghim", "Hủy"]
+          : ["Xóa", "Chuyển tiếp", "Ghim", "Hủy"];
+      
       const cancelButtonIndex = options.length - 1;
-  
+
       showActionSheetWithOptions(
         {
           options,
@@ -557,9 +629,13 @@ const handleOpenFile = (fileUrl) => {
           if (buttonIndex === 0) {
             handleDeleteMessage(item.id);
           } else if (buttonIndex === 1 && isMyMessage) {
-            handleRecallMessage(item.id,conversationId)
+            handleRecallMessage(item.id, conversationId);
           } else if ((isMyMessage && buttonIndex === 2) || (!isMyMessage && buttonIndex === 1)) {
             handleOpenForwardModal(item);
+          } else if (isPinned && (isMyMessage ? buttonIndex === 3 : buttonIndex === 2)) {
+            handleUnpinMessage();
+          } else if (!isPinned && (isMyMessage ? buttonIndex === 3 : buttonIndex === 2)) {
+            handlePinMessage(item.id);
           }
         }
       );
@@ -704,18 +780,24 @@ const handleOpenFile = (fileUrl) => {
               ) : (
                 <>
                   <TouchableOpacity 
-                    onPress={() => handleOpenVideo(item.imageUrl)}
+                    onPress={() => handleOpenVideo(item.id)}
                     style={styles.videoContainer}
+                    activeOpacity={0.8}
                   >
                     <Video
                       source={{ uri: item.imageUrl }}
                       style={styles.videoThumbnail}
-                      paused={true}
+                      paused={playingVideoId !== item.id}
                       resizeMode="cover"
+                      controls={playingVideoId === item.id}
+                      onEnd={() => setPlayingVideoId(null)}
                     />
-                    <View style={styles.playButton}>
-                      <Icon name="play" size={30} color="white" />
-                    </View>
+                    
+                    {playingVideoId !== item.id && (
+                      <View style={styles.playButton}>
+                        <Icon name="play" size={30} color="white" />
+                      </View>
+                    )}
                   </TouchableOpacity>
                 </>
               )}
@@ -763,6 +845,43 @@ const handleOpenFile = (fileUrl) => {
           </View>
         )}
       </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const PinnedMessageBar = () => {
+    if (!pinnedMessage) return null;
+
+    // Xác định nội dung hiển thị dựa trên loại tin nhắn
+    const getMessageContent = () => {
+      switch (pinnedMessage.type) {
+        case 'IMAGE':
+          return '📷 Hình ảnh';
+        case 'VIDEO':
+          return '🎬 Video';
+        case 'FILE':
+          return '📄 File';
+        default:
+          return pinnedMessage.body;
+      }
+    };
+
+    return (
+      <TouchableOpacity 
+        style={styles.pinnedContainer}
+        onPress={scrollToPinnedMessage}
+        onLongPress={handleUnpinMessage}
+        activeOpacity={0.7}
+      >
+        <View style={styles.pinnedContent}>
+          <MapPin width={16} height={16} color="#666" />
+          <Text style={styles.pinnedText} numberOfLines={1}>
+            {pinnedMessage.sender.name}: {getMessageContent()}
+          </Text>
+        </View>
+        <TouchableOpacity onPress={handleUnpinMessage}>
+          <XSquare size={16} color="#666" />
+        </TouchableOpacity>
       </TouchableOpacity>
     );
   };
@@ -1040,6 +1159,8 @@ const handleOpenFile = (fileUrl) => {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <View style={styles.messagesContainer}>
+          <PinnedMessageBar />
+
           <FlatList
             ref={flatListRef}
             data={messages}
@@ -1545,6 +1666,26 @@ const styles = StyleSheet.create({
     borderRadius: 15,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  pinnedContainer: {
+    backgroundColor: '#f5f5f5',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    padding: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pinnedContent: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  pinnedText: {
+    marginLeft: 8,
+    fontSize: 14,
+    color: '#666',
   },
 });
 

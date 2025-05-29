@@ -50,7 +50,7 @@ export const WebSocketProvider = ({ children }) => {
       tokenRef.current = token;
 
       // Use HTTP URL for SockJS
-      const baseUrl = 'http://192.168.1.6:8080';
+      const baseUrl = 'https://nhom10iuh.id.vn';
       
       const client = new Client({
         connectHeaders: {

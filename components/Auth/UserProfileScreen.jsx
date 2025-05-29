@@ -214,11 +214,11 @@ const UserProfileScreen = ({ navigation,onDateChange }) => {
         const response = await ApiService.register(formDataToSend);
         console.log("===> Phản hồi từ API:", response);
 
-        if (response?.status === 201 || response?.data?.code === 200) {
+        if (response?.status === 201 || response?.code === 200) {
             Alert.alert('Thành công', 'Đăng ký tài khoản thành công');
             nav.navigate("Login");
         } else {
-            const errorMsg = response?.data?.message || 'Không rõ lỗi';
+            const errorMsg = response?.message || 'Không rõ lỗi';
             console.error("Lỗi từ server:", errorMsg);
             Alert.alert('Lỗi', `Đăng ký thất bại: ${errorMsg}`);
         }
@@ -367,14 +367,14 @@ const handlePickImage = async () => {
         <View style={styles.radioContainer}>
           <Text style={styles.radioLabel}>Giới tính:</Text>
           <TouchableOpacity
-            style={[styles.radioButton, formData.gender === 'male' && styles.radioButtonSelected]}
-            onPress={() => handleChange('gender', 'male')}
+            style={[styles.radioButton, formData.gender === 'Nam' && styles.radioButtonSelected]}
+            onPress={() => handleChange('gender', 'Nam')}
           >
             <Text style={styles.radioText}>Nam</Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.radioButton, formData.gender === 'female' && styles.radioButtonSelected]}
-            onPress={() => handleChange('gender', 'female')}
+            style={[styles.radioButton, formData.gender === 'Nữ' && styles.radioButtonSelected]}
+            onPress={() => handleChange('gender', 'Nữ')}
           >
             <Text style={styles.radioText}>Nữ</Text>
           </TouchableOpacity>
